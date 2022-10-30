@@ -96,6 +96,14 @@ namespace VideoDL_m3u8.DL
                         var fileName = $"{index}".PadLeft($"{total}".Length, '0');
                         var filePath = Path.Combine(partDir, $"{fileName}{ext}");
 
+                        var rangeFrom = null as long?;
+                        var rangeTo = null as long?;
+                        if (item.ByteRange != null)
+                        {
+                            rangeFrom = item.ByteRange.Offset ?? 0;
+                            rangeTo = rangeFrom + item.ByteRange.Length - 1;
+                        }
+
                         await LoadStreamAsync(_httpClient, item.Uri, header, 
                             async (stream) =>
                             {
@@ -118,7 +126,7 @@ namespace VideoDL_m3u8.DL
                                         await stream.CopyToAsync(fs, 4096, token);
                                     }
                                 }
-                            });
+                            }, rangeFrom, rangeTo, token);
                     }
                     await Retry(async (retry) =>
                     {
@@ -187,7 +195,7 @@ namespace VideoDL_m3u8.DL
                 .ToString();
             File.WriteAllText(concatPath, fileManifest);
 
-            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -dn -y -bsf:a aac_adtstoasc -f mp4 ""{outputPath}"" -loglevel error";
+            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc -f mp4 ""{outputPath}"" -loglevel error";
             var info = new ProcessStartInfo("ffmpeg", arguments);
             info.UseShellExecute = false;
             info.RedirectStandardError = true;

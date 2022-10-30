@@ -45,7 +45,7 @@ namespace VideoDL_m3u8.Parser
     public class ByteRange
     {
         public int Length { get; set; }
-        public int Offset { get; set; }
+        public int? Offset { get; set; }
     }
 
     public class SegmentMap

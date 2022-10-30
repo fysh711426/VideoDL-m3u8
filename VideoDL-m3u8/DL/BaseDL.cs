@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Threading;
 using System.IO;
+using System.Net.Http.Headers;
 
 namespace VideoDL_m3u8.DL
 {
@@ -68,14 +69,16 @@ namespace VideoDL_m3u8.DL
             return await get(url);
         }
 
-        public async Task LoadStreamAsync(HttpClient httpClient,
+        public async Task LoadStreamAsync(HttpClient httpClient, 
             string url, string header, Func<Stream, Task> callback, 
-            CancellationToken token = default)
+            long? rangeFrom = null, long? rangeTo = null, CancellationToken token = default)
         {
             async Task load(string url)
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
                 {
+                    if (rangeFrom != null || rangeTo != null)
+                        request.Headers.Range = new RangeHeaderValue(rangeFrom, rangeTo);
                     SetRequestHeader(request, header);
                     using (var response = await httpClient.SendAsync(request,
                         HttpCompletionOption.ResponseHeadersRead, token))
