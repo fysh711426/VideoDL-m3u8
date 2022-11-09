@@ -13,8 +13,8 @@ namespace VideoDL_m3u8.DL
 
         public void SetRequestHeader(HttpRequestMessage request, string header)
         {
-            var splits = header.Split('|', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var attr in splits)
+            var attrs = header.Split('|', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var attr in attrs)
             {
                 var split = attr.Split(':', 2);
                 var key = split[0].Trim();
@@ -70,8 +70,9 @@ namespace VideoDL_m3u8.DL
         }
 
         public async Task LoadStreamAsync(HttpClient httpClient, 
-            string url, string header, Func<Stream, Task> callback, 
-            long? rangeFrom = null, long? rangeTo = null, CancellationToken token = default)
+            string url, string header, Func<Stream, Task> callback,
+            long? rangeFrom = null, long? rangeTo = null, 
+            CancellationToken token = default)
         {
             async Task load(string url)
             {
@@ -80,6 +81,7 @@ namespace VideoDL_m3u8.DL
                     if (rangeFrom != null || rangeTo != null)
                         request.Headers.Range = new RangeHeaderValue(rangeFrom, rangeTo);
                     SetRequestHeader(request, header);
+                    token.ThrowIfCancellationRequested();
                     using (var response = await httpClient.SendAsync(request,
                         HttpCompletionOption.ResponseHeadersRead, token))
                     {

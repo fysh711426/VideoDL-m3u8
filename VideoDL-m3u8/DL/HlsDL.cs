@@ -15,12 +15,14 @@ namespace VideoDL_m3u8.DL
     public class HlsDL: BaseDL
     {
         protected readonly HttpClient _httpClient;
-        public HlsDL() : this(Http.Client)
+        public HlsDL(int timeout = 6000) 
+            : this(Http.Client, timeout)
         {
         }
-        public HlsDL(HttpClient httpClient)
+        public HlsDL(HttpClient httpClient, int timeout = 6000)
         {
             _httpClient = httpClient;
+            _httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
         }
 
         public async Task<(string data, string url)> GetManifest(string url, string header, CancellationToken token = default)
@@ -42,12 +44,23 @@ namespace VideoDL_m3u8.DL
             return parser.Parse(manifest.data, manifest.url);
         }
 
-        public async Task<Dictionary<string, string>> DownloadKeys(
+        public List<string> GetKeyUrls(List<Part> parts)
+        {
+            return parts
+                .SelectMany(it => it.Segments)
+                .Select(it => it.Key)
+                .Where(it => it.Method != "NONE")
+                .Select(it => it.Uri)
+                .Distinct()
+                .ToList();
+        }
+
+        public async Task<Dictionary<string, string>> GetKeys(
             string header, List<string> keyUrls, 
             CancellationToken token = default)
         {
             var result = new Dictionary<string, string>();
-            foreach(var url in keyUrls)
+            foreach (var url in keyUrls)
             {
                 var data =  await GetBytesAsync(_httpClient, url, header, token);
                 var key = Convert.ToBase64String(data);
@@ -56,8 +69,11 @@ namespace VideoDL_m3u8.DL
             return result;
         }
 
-        public async Task Download(string workDir, string saveName, 
-            string m3u8Url, string header, List<Part> parts,
+        public async Task Download(
+            string workDir, string saveName, string header, 
+            List<Part> parts, Dictionary<string, string>? keys = null,
+            int maxThreads = 1, int delay = 1, int retry = 20,
+            int? maxSpeed = null, int? stopSpeed = null,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(saveName))
@@ -68,15 +84,8 @@ namespace VideoDL_m3u8.DL
             if (!Directory.Exists(tempDir))
                 Directory.CreateDirectory(tempDir);
 
-            var keyUrls = parts
-                .SelectMany(it => it.Segments)
-                .Select(it => it.Key)
-                .Where(it => it.Method != "NONE")
-                .Select(it => it.Uri)
-                .Distinct()
-                .ToList();
-
-            var keys = await DownloadKeys(header, keyUrls, token);
+            var works = 
+                new List<(int index, string filePath, Segment segment)>();
 
             var partIndex = 0;
             foreach (var part in parts)
@@ -90,52 +99,60 @@ namespace VideoDL_m3u8.DL
 
                 foreach (var item in part.Segments)
                 {
-                    async Task download()
-                    {
-                        var ext = ".ts";
-                        var fileName = $"{index}".PadLeft($"{total}".Length, '0');
-                        var filePath = Path.Combine(partDir, $"{fileName}{ext}");
-
-                        var rangeFrom = null as long?;
-                        var rangeTo = null as long?;
-                        if (item.ByteRange != null)
-                        {
-                            rangeFrom = item.ByteRange.Offset ?? 0;
-                            rangeTo = rangeFrom + item.ByteRange.Length - 1;
-                        }
-
-                        await LoadStreamAsync(_httpClient, item.Uri, header, 
-                            async (stream) =>
-                            {
-                                using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write))
-                                {
-                                    if (item.Key.Method != "NONE")
-                                    {
-                                        var key = keys[item.Key.Uri];
-                                        if (string.IsNullOrWhiteSpace(key))
-                                            throw new Exception("Not found segment key.");
-                                        var iv = item.Key.IV;
-                                        var ms = new MemoryStream();
-                                        await stream.CopyToAsync(ms, 4096, token);
-                                        ms.Position = 0;
-                                        var cryptor = new Cryptor();
-                                        await cryptor.AES128Decrypt(ms, key, iv, fs, token);
-                                    }
-                                    else
-                                    {
-                                        await stream.CopyToAsync(fs, 4096, token);
-                                    }
-                                }
-                            }, rangeFrom, rangeTo, token);
-                    }
-                    await Retry(async (retry) =>
-                    {
-                        await download();
-                    }, 10000);
+                    var fileName = $"{index}".PadLeft($"{total}".Length, '0');
+                    var filePath = Path.Combine(partDir, $"{fileName}");
+                    if(!File.Exists($"{filePath}.ts"))
+                        works.Add((index, filePath, item));
                     index++;
                 }
                 partIndex++;
             }
+
+            await ParallelTask.Run(works, async it =>
+            {
+                var index = it.index;
+                var filePath = it.filePath;
+                var segment = it.segment;
+
+                var rangeFrom = null as long?;
+                var rangeTo = null as long?;
+                if (segment.ByteRange != null)
+                {
+                    rangeFrom = segment.ByteRange.Offset ?? 0;
+                    rangeTo = rangeFrom + segment.ByteRange.Length - 1;
+                }
+
+                var tempPath = $"{filePath}.downloading";
+                var savePath = $"{filePath}.ts";
+
+                if (File.Exists(savePath))
+                    return;
+
+                await LoadStreamAsync(_httpClient, segment.Uri, header,
+                    async (stream) =>
+                    {
+                        using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                        {
+                            if (segment.Key.Method != "NONE")
+                            {
+                                if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
+                                    string.IsNullOrEmpty(key))
+                                    throw new Exception("Not found segment key.");
+                                var iv = segment.Key.IV;
+                                var ms = new MemoryStream();
+                                await stream.CopyToAsync(ms, 4096, token);
+                                ms.Position = 0;
+                                var cryptor = new Cryptor();
+                                await cryptor.AES128Decrypt(ms, key, iv, fs, token);
+                            }
+                            else
+                            {
+                                await stream.CopyToAsync(fs, 4096, token);
+                            }
+                        }
+                        File.Move(tempPath, savePath);
+                    }, rangeFrom, rangeTo, token);
+            }, maxThreads, delay, retry, token);
         }
 
         public async Task Merge(string workDir, string saveName, bool cleanTempFile,
