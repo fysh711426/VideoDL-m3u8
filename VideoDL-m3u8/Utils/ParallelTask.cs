@@ -23,6 +23,9 @@ namespace VideoDL_m3u8.Utils
 
             var tasks = new List<Task>();
 
+            var stop = false;
+            var locker = new object();
+            
             var totalCount = queue.Count;
             var finishCount = 0;
             var retryCount = 0;
@@ -51,17 +54,33 @@ namespace VideoDL_m3u8.Utils
                                     try
                                     {
                                         await worker(next, cts.Token);
+                                        finishCount++;
                                     }
                                     catch (OperationCanceledException)
                                     {
+                                        throw;
                                     }
                                     catch (Exception ex)
                                     {
-                                        retryCount++;
-                                        if (retryCount > retry)
-                                            throw new OverRetryException(ex);
-                                        await Task.Delay(delay);
-                                        await func();
+                                        lock (locker)
+                                        {
+                                            if (!stop)
+                                            {
+                                                if (retryCount >= retry)
+                                                {
+                                                    stop = true;
+                                                    throw new OverRetryException(ex);
+                                                }
+                                                retryCount++;
+                                            }
+                                        }
+                                        if (!stop)
+                                        {
+                                            await Task.Delay(delay);
+                                            await func();
+                                            return;
+                                        }
+                                        throw;
                                     }
                                 }
                                 await func();
@@ -96,6 +115,9 @@ namespace VideoDL_m3u8.Utils
                     {
                     }
                     throw;
+                }
+                catch (OperationCanceledException)
+                {
                 }
                 finally
                 {
