@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using VideoDL_m3u8.Events;
 using VideoDL_m3u8.Parser;
 using VideoDL_m3u8.Utils;
 
@@ -74,6 +75,7 @@ namespace VideoDL_m3u8.DL
             List<Part> parts, Dictionary<string, string>? keys = null,
             int maxThreads = 1, int delay = 1, int retry = 20,
             int? maxSpeed = null, int? stopSpeed = null,
+            IProgress<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(saveName))
@@ -108,7 +110,7 @@ namespace VideoDL_m3u8.DL
                 partIndex++;
             }
 
-            await ParallelTask.Run(works, async it =>
+            await ParallelTask.Run(works, async (it, _token) =>
             {
                 var index = it.index;
                 var filePath = it.filePath;
@@ -140,19 +142,19 @@ namespace VideoDL_m3u8.DL
                                     throw new Exception("Not found segment key.");
                                 var iv = segment.Key.IV;
                                 var ms = new MemoryStream();
-                                await stream.CopyToAsync(ms, 4096, token);
+                                await stream.CopyToAsync(ms, 4096, _token);
                                 ms.Position = 0;
                                 var cryptor = new Cryptor();
-                                await cryptor.AES128Decrypt(ms, key, iv, fs, token);
+                                await cryptor.AES128Decrypt(ms, key, iv, fs, _token);
                             }
                             else
                             {
-                                await stream.CopyToAsync(fs, 4096, token);
+                                await stream.CopyToAsync(fs, 4096, _token);
                             }
                         }
                         File.Move(tempPath, savePath);
-                    }, rangeFrom, rangeTo, token);
-            }, maxThreads, delay, retry, token);
+                    }, rangeFrom, rangeTo, _token);
+            }, maxThreads, delay, retry, progress, token);
         }
 
         public async Task Merge(string workDir, string saveName, bool cleanTempFile,
