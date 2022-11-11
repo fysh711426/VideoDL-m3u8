@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.3.32901.215
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoDL-m3u8", "VideoDL-m3u8.csproj", "{776764C2-2D2D-42FE-99F6-7B7DE855B66A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VideoDL-m3u8", "VideoDL-m3u8.csproj", "{776764C2-2D2D-42FE-99F6-7B7DE855B66A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "..\Test\Test.csproj", "{962DD013-672F-4B84-8B5E-FCC61B81C153}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test", "..\Test\Test.csproj", "{962DD013-672F-4B84-8B5E-FCC61B81C153}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example", "..\Example\Example.csproj", "{647880E7-C1D2-4546-A29A-A66695B487CD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{962DD013-672F-4B84-8B5E-FCC61B81C153}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{962DD013-672F-4B84-8B5E-FCC61B81C153}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{962DD013-672F-4B84-8B5E-FCC61B81C153}.Release|Any CPU.Build.0 = Release|Any CPU
+		{647880E7-C1D2-4546-A29A-A66695B487CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{647880E7-C1D2-4546-A29A-A66695B487CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{647880E7-C1D2-4546-A29A-A66695B487CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{647880E7-C1D2-4546-A29A-A66695B487CD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Net;
 using System.Net.Http;
-using System.Security.Authentication;
 
 namespace VideoDL_m3u8.Utils
 {

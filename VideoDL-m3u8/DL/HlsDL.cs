@@ -73,8 +73,8 @@ namespace VideoDL_m3u8.DL
         public async Task Download(
             string workDir, string saveName, string header, 
             List<Part> parts, Dictionary<string, string>? keys = null,
-            int maxThreads = 1, int delay = 1, int retry = 20,
-            int? maxSpeed = null, int? stopSpeed = null,
+            int maxThreads = 1, int delay = 1, int maxRetry = 20,
+            int? maxSpeed = null, int interval = 1000,
             IProgress<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
@@ -93,7 +93,7 @@ namespace VideoDL_m3u8.DL
             foreach (var part in parts)
             {
                 var index = 0;
-                var total = part.Segments.Count;
+                var count = part.Segments.Count;
                 var partName = $"Part_{partIndex}".PadLeft($"{parts.Count}".Length, '0');
                 var partDir = Path.Combine(tempDir, partName);
                 if (!Directory.Exists(partDir))
@@ -101,60 +101,156 @@ namespace VideoDL_m3u8.DL
 
                 foreach (var item in part.Segments)
                 {
-                    var fileName = $"{index}".PadLeft($"{total}".Length, '0');
+                    var fileName = $"{index}".PadLeft($"{count}".Length, '0');
                     var filePath = Path.Combine(partDir, $"{fileName}");
-                    if(!File.Exists($"{filePath}.ts"))
-                        works.Add((index, filePath, item));
+                    works.Add((index, filePath, item));
                     index++;
                 }
                 partIndex++;
             }
 
-            await ParallelTask.Run(works, async (it, _token) =>
+            var retry = 0;
+            var total = 0;
+            var finish = 0;
+            var downloadBytes = 0L;
+            var intervalDownloadBytes = 0;
+            total = works.Count;
+
+            async Task<long> copyToAsync(Stream s, Stream d, 
+                CancellationToken token = default)
             {
-                var index = it.index;
-                var filePath = it.filePath;
-                var segment = it.segment;
-
-                var rangeFrom = null as long?;
-                var rangeTo = null as long?;
-                if (segment.ByteRange != null)
+                var bytes = 0L;
+                var buffer = new byte[1024];
+                var size = 0;
+                while(true)
                 {
-                    rangeFrom = segment.ByteRange.Offset ?? 0;
-                    rangeTo = rangeFrom + segment.ByteRange.Length - 1;
-                }
-
-                var tempPath = $"{filePath}.downloading";
-                var savePath = $"{filePath}.ts";
-
-                if (File.Exists(savePath))
-                    return;
-
-                await LoadStreamAsync(_httpClient, segment.Uri, header,
-                    async (stream) =>
+                    size = await s.ReadAsync(buffer, 0, buffer.Length, token);
+                    if (size <= 0)
+                        return bytes;
+                    await d.WriteAsync(buffer, 0, size, token);
+                    bytes += size;
+                    Interlocked.Add(ref intervalDownloadBytes, size);
+                    if (maxSpeed != null)
                     {
-                        using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                        while (intervalDownloadBytes >= maxSpeed.Value * interval * 0.001)
                         {
-                            if (segment.Key.Method != "NONE")
-                            {
-                                if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
-                                    string.IsNullOrEmpty(key))
-                                    throw new Exception("Not found segment key.");
-                                var iv = segment.Key.IV;
-                                var ms = new MemoryStream();
-                                await stream.CopyToAsync(ms, 4096, _token);
-                                ms.Position = 0;
-                                var cryptor = new Cryptor();
-                                await cryptor.AES128Decrypt(ms, key, iv, fs, _token);
-                            }
-                            else
-                            {
-                                await stream.CopyToAsync(fs, 4096, _token);
-                            }
+                            await Task.Delay(1, token);
                         }
-                        File.Move(tempPath, savePath);
-                    }, rangeFrom, rangeTo, _token);
-            }, maxThreads, delay, retry, progress, token);
+                    }
+                }
+            }
+
+            async Task func()
+            {
+                //var c = 0;
+                await ParallelTask.Run(works, async (it, _token) =>
+                {
+                    //if (c > 10)
+                    //{
+                    //    throw new Exception("xxx");
+                    //}
+                    //c++;
+
+                    var index = it.index;
+                    var filePath = it.filePath;
+                    var segment = it.segment;
+
+                    var rangeFrom = null as long?;
+                    var rangeTo = null as long?;
+                    if (segment.ByteRange != null)
+                    {
+                        rangeFrom = segment.ByteRange.Offset ?? 0;
+                        rangeTo = rangeFrom + segment.ByteRange.Length - 1;
+                    }
+
+                    var tempPath = $"{filePath}.downloading";
+                    var savePath = $"{filePath}.ts";
+
+                    if (File.Exists(savePath))
+                        return;
+
+                    await LoadStreamAsync(_httpClient, segment.Uri, header,
+                        async (stream) =>
+                        {
+                            using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                            {
+                                if (segment.Key.Method != "NONE")
+                                {
+                                    if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
+                                        string.IsNullOrEmpty(key))
+                                        throw new Exception("Not found segment key.");
+                                    var iv = segment.Key.IV;
+                                    var ms = new MemoryStream();
+                                    var size = await copyToAsync(stream, ms, _token);
+                                    Interlocked.Add(ref downloadBytes, size);
+                                    ms.Position = 0;
+                                    var cryptor = new Cryptor();
+                                    await cryptor.AES128Decrypt(ms, key, iv, fs, _token);
+                                }
+                                else
+                                {
+                                    var size = await copyToAsync(stream, fs, _token);
+                                    Interlocked.Add(ref downloadBytes, size);
+                                }
+                            }
+                            File.Move(tempPath, savePath);
+                        }, rangeFrom, rangeTo, _token);
+                    finish++;
+                }, maxThreads, delay, maxRetry, (c) => retry = c, token);
+            }
+
+            void progressEvent()
+            {
+                try
+                {
+                    if (progress != null)
+                    {
+                        var time = DateTime.Now;
+                        var percentage = (double)finish / total;
+                        var totalBytes = (long)Number.Safe(() => 
+                            downloadBytes * total / finish);
+                        var speed = intervalDownloadBytes / interval * 1000;
+                        var eta = (int)Number.Safe(() =>
+                            (totalBytes - downloadBytes) / speed);
+                        var args = new ProgressEventArgs
+                        {
+                            Time = time,
+                            Total = total,
+                            Finish = finish,
+                            DownloadBytes = downloadBytes,
+                            MaxRetry = maxRetry,
+                            Retry = retry,
+                            Percentage = percentage,
+                            TotalBytes = totalBytes,
+                            Speed = speed,
+                            Eta = eta
+                        };
+                        progress.Report(args);
+                    }
+                }
+                catch (Exception) { }
+            }
+
+            var timer = new System.Timers.Timer(interval);
+            timer.AutoReset = true;
+            timer.Elapsed += delegate
+            {
+                progressEvent();
+                Interlocked.Exchange(ref intervalDownloadBytes, 0);
+            };
+
+            try
+            {
+                timer.Enabled = true;
+                await func();
+                timer.Enabled = false;
+                progressEvent();
+            }
+            catch 
+            {
+                timer.Enabled = false;
+                throw;
+            }
         }
 
         public async Task Merge(string workDir, string saveName, bool cleanTempFile,
@@ -245,27 +341,6 @@ namespace VideoDL_m3u8.DL
                     Directory.Delete(tempDir, true);
                 }
                 catch { }
-            }
-        }
-
-        protected async Task Retry(Func<int, Task> func, int delay, int? retry = null)
-        {
-            var _count = 0;
-            var _retry = retry ?? int.MaxValue;
-            while (true)
-            {
-                try
-                {
-                    await func(_count);
-                    break;
-                }
-                catch (Exception)
-                {
-                    if (_count >= _retry)
-                        break;
-                    _count++;
-                    await Task.Delay(delay);
-                }
             }
         }
     }

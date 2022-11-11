@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using VideoDL_m3u8.Events;
 using VideoDL_m3u8.Exceptions;
 
 namespace VideoDL_m3u8.Utils
@@ -13,8 +11,7 @@ namespace VideoDL_m3u8.Utils
     {
         public static async Task Run<TSource>(IEnumerable<TSource> source,
             Func<TSource, CancellationToken, Task> worker,
-            int maxThreads, int delay, int retry,
-            IProgress<ProgressEventArgs>? progress = null,
+            int maxThreads, int delay, int maxRetry, Action<int> onRetry,
             CancellationToken token = default)
         {
             var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -25,14 +22,7 @@ namespace VideoDL_m3u8.Utils
 
             var stop = false;
             var locker = new object();
-            
-            var totalCount = queue.Count;
-            var finishCount = 0;
-            var retryCount = 0;
-            var totalBytes = 0L;
-            var finishBytes = 0L;
-            var speed = 0;
-            var eta = 0;
+            var retry = 0;
 
             while (true)
             {
@@ -54,7 +44,6 @@ namespace VideoDL_m3u8.Utils
                                     try
                                     {
                                         await worker(next, cts.Token);
-                                        finishCount++;
                                     }
                                     catch (OperationCanceledException)
                                     {
@@ -66,17 +55,18 @@ namespace VideoDL_m3u8.Utils
                                         {
                                             if (!stop)
                                             {
-                                                if (retryCount >= retry)
+                                                if (retry >= maxRetry)
                                                 {
                                                     stop = true;
                                                     throw new OverRetryException(ex);
                                                 }
-                                                retryCount++;
+                                                retry++;
                                             }
                                         }
                                         if (!stop)
                                         {
                                             await Task.Delay(delay);
+                                            onRetry(retry);
                                             await func();
                                             return;
                                         }
