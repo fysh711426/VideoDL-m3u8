@@ -73,7 +73,7 @@ namespace VideoDL_m3u8.DL
         public async Task Download(
             string workDir, string saveName, string header, 
             List<Part> parts, Dictionary<string, string>? keys = null,
-            int maxThreads = 1, int delay = 1, int maxRetry = 20,
+            int maxThreads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
             IProgress<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
@@ -114,9 +114,8 @@ namespace VideoDL_m3u8.DL
             var finish = 0;
             var downloadBytes = 0L;
             var intervalDownloadBytes = 0L;
-            total = works.Count;
 
-            async Task<long> copyToAsync(Stream s, Stream d, 
+            async Task<long> copyToAsync(Stream s, Stream d,
                 CancellationToken token = default)
             {
                 var bytes = 0L;
@@ -145,66 +144,72 @@ namespace VideoDL_m3u8.DL
 
             async Task func()
             {
-                var c = 0;
-                await ParallelTask.Run(works, async (it, _token) =>
+                await RetryTask.Run(async (r, ex) =>
                 {
-                    if (c > 10)
+                    retry = 0;
+                    total = 0;
+                    finish = 0;
+                    downloadBytes = 0L;
+                    intervalDownloadBytes = 0L;
+                    total = works.Count;
+                    retry = r;
+                    progressEvent();
+
+                    await ParallelTask.Run(works, async (it, _token) =>
                     {
-                        throw new Exception("xxx");
-                    }
-                    c++;
+                        var index = it.index;
+                        var filePath = it.filePath;
+                        var segment = it.segment;
 
-                    var index = it.index;
-                    var filePath = it.filePath;
-                    var segment = it.segment;
-
-                    var rangeFrom = null as long?;
-                    var rangeTo = null as long?;
-                    if (segment.ByteRange != null)
-                    {
-                        rangeFrom = segment.ByteRange.Offset ?? 0;
-                        rangeTo = rangeFrom + segment.ByteRange.Length - 1;
-                    }
-
-                    var tempPath = $"{filePath}.downloading";
-                    var savePath = $"{filePath}.ts";
-
-                    if (File.Exists(savePath))
-                    {
-                        var info = new FileInfo(savePath);
-                        Interlocked.Add(ref downloadBytes, info.Length);
-                        finish++;
-                        return;
-                    }
-
-                    await LoadStreamAsync(_httpClient, segment.Uri, header,
-                        async (stream) =>
+                        var rangeFrom = null as long?;
+                        var rangeTo = null as long?;
+                        if (segment.ByteRange != null)
                         {
-                            using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                            rangeFrom = segment.ByteRange.Offset ?? 0;
+                            rangeTo = rangeFrom + segment.ByteRange.Length - 1;
+                        }
+
+                        var tempPath = $"{filePath}.downloading";
+                        var savePath = $"{filePath}.ts";
+
+                        if (File.Exists(savePath))
+                        {
+                            var info = new FileInfo(savePath);
+                            Interlocked.Add(ref downloadBytes, info.Length);
+                            finish++;
+                            progressEvent();
+                            return;
+                        }
+
+                        await LoadStreamAsync(_httpClient, segment.Uri, header,
+                            async (stream) =>
                             {
-                                if (segment.Key.Method != "NONE")
+                                using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                 {
-                                    if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
-                                        string.IsNullOrEmpty(key))
-                                        throw new Exception("Not found segment key.");
-                                    var iv = segment.Key.IV;
-                                    var ms = new MemoryStream();
-                                    var size = await copyToAsync(stream, ms, _token);
-                                    Interlocked.Add(ref downloadBytes, size);
-                                    ms.Position = 0;
-                                    var cryptor = new Cryptor();
-                                    await cryptor.AES128Decrypt(ms, key, iv, fs, _token);
+                                    if (segment.Key.Method != "NONE")
+                                    {
+                                        if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
+                                            string.IsNullOrEmpty(key))
+                                            throw new Exception("Not found segment key.");
+                                        var iv = segment.Key.IV;
+                                        var ms = new MemoryStream();
+                                        var size = await copyToAsync(stream, ms, _token);
+                                        Interlocked.Add(ref downloadBytes, size);
+                                        ms.Position = 0;
+                                        var cryptor = new Cryptor();
+                                        await cryptor.AES128Decrypt(ms, key, iv, fs, _token);
+                                    }
+                                    else
+                                    {
+                                        var size = await copyToAsync(stream, fs, _token);
+                                        Interlocked.Add(ref downloadBytes, size);
+                                    }
                                 }
-                                else
-                                {
-                                    var size = await copyToAsync(stream, fs, _token);
-                                    Interlocked.Add(ref downloadBytes, size);
-                                }
-                            }
-                            File.Move(tempPath, savePath);
-                        }, rangeFrom, rangeTo, _token);
-                    finish++;
-                }, maxThreads, delay, maxRetry, (c) => retry = c, token);
+                                File.Move(tempPath, savePath);
+                            }, rangeFrom, rangeTo, _token);
+                        finish++;
+                    }, maxThreads, delay, token);
+                }, 10 * 1024, maxRetry, token);
             }
 
             void progressEvent()

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using VideoDL_m3u8.Exceptions;
 
 namespace VideoDL_m3u8.Utils
 {
@@ -11,18 +10,13 @@ namespace VideoDL_m3u8.Utils
     {
         public static async Task Run<TSource>(IEnumerable<TSource> source,
             Func<TSource, CancellationToken, Task> worker,
-            int maxThreads, int delay, int maxRetry, Action<int> onRetry,
-            CancellationToken token = default)
+            int maxThreads, int delay, CancellationToken token = default)
         {
             var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
 
             var queue = new ConcurrentQueue<TSource>(source);
 
             var tasks = new List<Task>();
-
-            var stop = false;
-            var locker = new object();
-            var retry = 0;
 
             while (true)
             {
@@ -31,7 +25,7 @@ namespace VideoDL_m3u8.Utils
                     break;
                 }
 
-                if (!stop && !token.IsCancellationRequested)
+                if (!token.IsCancellationRequested)
                 {
                     if (tasks.Count < maxThreads)
                     {
@@ -39,41 +33,7 @@ namespace VideoDL_m3u8.Utils
                         {
                             var task = Task.Run(async () =>
                             {
-                                async Task func()
-                                {
-                                    try
-                                    {
-                                        await worker(next, cts.Token);
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        throw;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        lock (locker)
-                                        {
-                                            if (!stop)
-                                            {
-                                                if (retry >= maxRetry)
-                                                {
-                                                    stop = true;
-                                                    throw new OverRetryException(ex);
-                                                }
-                                                retry++;
-                                            }
-                                        }
-                                        if (!stop)
-                                        {
-                                            await Task.Delay(10 * 1000);
-                                            onRetry(retry);
-                                            await func();
-                                            return;
-                                        }
-                                        throw;
-                                    }
-                                }
-                                await func();
+                                await worker(next, cts.Token);
                             });
                             tasks.Add(task);
                             await Task.Delay(delay);
@@ -94,23 +54,14 @@ namespace VideoDL_m3u8.Utils
                 {
                     await finish;
                 }
-                catch(OverRetryException)
+                catch
                 {
-                    cts.Cancel();
                     try
                     {
                         await Task.WhenAll(tasks.ToArray());
                     }
-                    catch 
-                    { 
-                    }
+                    catch { }
                     throw;
-                }
-                catch (OperationCanceledException)
-                {
-                }
-                catch
-                {
                 }
                 finally
                 {
