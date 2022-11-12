@@ -31,7 +31,7 @@ namespace VideoDL_m3u8.Utils
                     break;
                 }
 
-                if (!token.IsCancellationRequested)
+                if (!stop && !token.IsCancellationRequested)
                 {
                     if (tasks.Count < maxThreads)
                     {
@@ -65,7 +65,7 @@ namespace VideoDL_m3u8.Utils
                                         }
                                         if (!stop)
                                         {
-                                            await Task.Delay(delay);
+                                            await Task.Delay(10 * 1000);
                                             onRetry(retry);
                                             await func();
                                             return;
@@ -99,14 +99,17 @@ namespace VideoDL_m3u8.Utils
                     cts.Cancel();
                     try
                     {
-                        Task.WaitAll(tasks.ToArray());
+                        await Task.WhenAll(tasks.ToArray());
                     }
                     catch 
-                    {
+                    { 
                     }
                     throw;
                 }
                 catch (OperationCanceledException)
+                {
+                }
+                catch
                 {
                 }
                 finally
