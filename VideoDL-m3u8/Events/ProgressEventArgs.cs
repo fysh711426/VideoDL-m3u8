@@ -13,7 +13,7 @@ namespace VideoDL_m3u8.Events
         public long DownloadBytes { get; set; }
         public int MaxRetry { get; set; }
         public int Retry { get; set; }
-        public int Speed { get; set; }
+        public long Speed { get; set; }
         public int Eta { get; set; }
         public string Format 
         { 
@@ -25,7 +25,7 @@ namespace VideoDL_m3u8.Events
                 var downloadSize = Filter.FormatFileSize(DownloadBytes);
                 var speed = Filter.FormatFileSize(Speed);
                 var eta = Filter.FormatTime(Eta);
-                var print = $@"{time} Progress: {Finish}/{Total} ({percentage} %) -- {downloadSize}/{totalSize} ({speed}/s @ {eta})";
+                var print = $@"{time} Progress: {Finish}/{Total} ({percentage} %) -- {downloadSize}/{totalSize} ({speed}/s @ {eta}) -- Retry ({Retry}/{MaxRetry})";
                 return print;
             }
         }

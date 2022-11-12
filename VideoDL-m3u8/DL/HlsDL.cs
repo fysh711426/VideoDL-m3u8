@@ -74,7 +74,7 @@ namespace VideoDL_m3u8.DL
             string workDir, string saveName, string header, 
             List<Part> parts, Dictionary<string, string>? keys = null,
             int maxThreads = 1, int delay = 1, int maxRetry = 20,
-            int? maxSpeed = null, int interval = 1000,
+            long? maxSpeed = null, int interval = 1000,
             IProgress<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
@@ -113,7 +113,7 @@ namespace VideoDL_m3u8.DL
             var total = 0;
             var finish = 0;
             var downloadBytes = 0L;
-            var intervalDownloadBytes = 0;
+            var intervalDownloadBytes = 0L;
             total = works.Count;
 
             async Task<long> copyToAsync(Stream s, Stream d, 
@@ -122,7 +122,10 @@ namespace VideoDL_m3u8.DL
                 var bytes = 0L;
                 var buffer = new byte[1024];
                 var size = 0;
-                while(true)
+                var limit = 0L;
+                if (maxSpeed != null)
+                    limit = (long)(0.001 * interval * maxSpeed.Value - maxThreads * 1024);
+                while (true)
                 {
                     size = await s.ReadAsync(buffer, 0, buffer.Length, token);
                     if (size <= 0)
@@ -132,7 +135,7 @@ namespace VideoDL_m3u8.DL
                     Interlocked.Add(ref intervalDownloadBytes, size);
                     if (maxSpeed != null)
                     {
-                        while (intervalDownloadBytes >= maxSpeed.Value * interval * 0.001)
+                        while (intervalDownloadBytes >= limit)
                         {
                             await Task.Delay(1, token);
                         }
@@ -142,14 +145,14 @@ namespace VideoDL_m3u8.DL
 
             async Task func()
             {
-                //var c = 0;
+                var c = 0;
                 await ParallelTask.Run(works, async (it, _token) =>
                 {
-                    //if (c > 10)
-                    //{
-                    //    throw new Exception("xxx");
-                    //}
-                    //c++;
+                    if (c > 10)
+                    {
+                        throw new Exception("xxx");
+                    }
+                    c++;
 
                     var index = it.index;
                     var filePath = it.filePath;
@@ -167,7 +170,12 @@ namespace VideoDL_m3u8.DL
                     var savePath = $"{filePath}.ts";
 
                     if (File.Exists(savePath))
+                    {
+                        var info = new FileInfo(savePath);
+                        Interlocked.Add(ref downloadBytes, info.Length);
+                        finish++;
                         return;
+                    }
 
                     await LoadStreamAsync(_httpClient, segment.Uri, header,
                         async (stream) =>
@@ -207,11 +215,9 @@ namespace VideoDL_m3u8.DL
                     {
                         var time = DateTime.Now;
                         var percentage = (double)finish / total;
-                        var totalBytes = (long)Number.Safe(() => 
-                            downloadBytes * total / finish);
+                        var totalBytes = (long)Number.Div(downloadBytes * total, finish);
                         var speed = intervalDownloadBytes / interval * 1000;
-                        var eta = (int)Number.Safe(() =>
-                            (totalBytes - downloadBytes) / speed);
+                        var eta = (int)Number.Div(totalBytes - downloadBytes, speed);
                         var args = new ProgressEventArgs
                         {
                             Time = time,
@@ -246,7 +252,7 @@ namespace VideoDL_m3u8.DL
                 timer.Enabled = false;
                 progressEvent();
             }
-            catch 
+            catch
             {
                 timer.Enabled = false;
                 throw;
