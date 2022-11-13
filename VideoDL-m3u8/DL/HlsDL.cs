@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8.Events;
+using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
 using VideoDL_m3u8.Utils;
 
@@ -16,35 +17,102 @@ namespace VideoDL_m3u8.DL
     public class HlsDL: BaseDL
     {
         protected readonly HttpClient _httpClient;
+
+        /// <summary>
+        /// Init HlsDL.
+        /// </summary>
+        /// <param name="timeout">Set http request timeout.(millisecond)</param>
         public HlsDL(int timeout = 6000) 
             : this(Http.Client, timeout)
         {
         }
+
+        /// <summary>
+        /// Init HlsDL.
+        /// </summary>
+        /// <param name="httpClient">Set http client.</param>
+        /// <param name="timeout">Set http request timeout.(millisecond)</param>
         public HlsDL(HttpClient httpClient, int timeout = 6000)
         {
             _httpClient = httpClient;
             _httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
         }
 
-        public async Task<(string data, string url)> GetManifest(string url, string header, CancellationToken token = default)
+        /// <summary>
+        /// Get m3u8 manifest by url.
+        /// </summary>
+        /// <param name="url">Set m3u8 download url.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task<(string data, string url)> GetManifestAsync(
+            string url, string header = "", CancellationToken token = default)
         {
             return await GetStringAsync(_httpClient, url, header, token);
         }
 
-        public async Task<MasterPlaylist> GetMasterPlaylist(string url, string header, CancellationToken token = default)
+        /// <summary>
+        /// Get m3u8 master playlist by url.
+        /// </summary>
+        /// <param name="url">Set m3u8 download url.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task<MasterPlaylist> GetMasterPlaylistAsync(
+            string url, string header = "", CancellationToken token = default)
         {
-            var manifest = await GetManifest(url, header, token);
+            var manifest = await GetManifestAsync(url, header, token);
             var parser = new MasterPlaylistParser();
             return parser.Parse(manifest.data, manifest.url);
         }
 
-        public async Task<MediaPlaylist> GetMediaPlaylist(string url, string header, CancellationToken token = default)
+        /// <summary>
+        /// Get m3u8 media playlist by url.
+        /// </summary>
+        /// <param name="url">Set m3u8 download url.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task<MediaPlaylist> GetMediaPlaylistAsync(
+            string url, string header = "", CancellationToken token = default)
         {
-            var manifest = await GetManifest(url, header, token);
+            var manifest = await GetManifestAsync(url, header, token);
             var parser = new MediaPlaylistParser();
             return parser.Parse(manifest.data, manifest.url);
         }
 
+        /// <summary>
+        /// Parse m3u8 master playlist by manifest.
+        /// </summary>
+        /// <param name="manifest">Set m3u8 master manifest.</param>
+        /// <param name="url">Set m3u8 url.</param>
+        /// <returns></returns>
+        public MasterPlaylist ParseMasterPlaylist(string manifest, string url)
+        {
+            var parser = new MasterPlaylistParser();
+            return parser.Parse(manifest, url);
+        }
+
+        /// <summary>
+        /// Parse m3u8 media playlist by manifest.
+        /// </summary>
+        /// <param name="manifest">Set m3u8 media manifest.</param>
+        /// <param name="url">Set m3u8 url.</param>
+        /// <returns></returns>
+        public MediaPlaylist ParseMediaPlaylist(string manifest, string url)
+        {
+            var parser = new MediaPlaylistParser();
+            return parser.Parse(manifest, url);
+        }
+
+        /// <summary>
+        /// Get m3u8 keys url by parts.
+        /// </summary>
+        /// <param name="parts">Set m3u8 playlist parts.</param>
+        /// <returns></returns>
         public List<string> GetKeyUrls(List<Part> parts)
         {
             return parts
@@ -56,32 +124,71 @@ namespace VideoDL_m3u8.DL
                 .ToList();
         }
 
-        public async Task<Dictionary<string, string>> GetKeys(
-            string header, List<string> keyUrls, 
+        /// <summary>
+        /// Get m3u8 keys by urls.
+        /// </summary>
+        /// <param name="keyUrls">Set m3u8 keys url.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, string>> GetKeysAsync(
+            List<string> keyUrls, string header = "",
             CancellationToken token = default)
         {
             var result = new Dictionary<string, string>();
             foreach (var url in keyUrls)
             {
-                var data =  await GetBytesAsync(_httpClient, url, header, token);
+                var data = await GetBytesAsync(_httpClient, url, header, token);
                 var key = Convert.ToBase64String(data);
                 result.Add(url, key);
             }
             return result;
         }
 
-        public async Task Download(
-            string workDir, string saveName, string header, 
-            List<Part> parts, Dictionary<string, string>? keys = null,
-            int maxThreads = 1, int delay = 200, int maxRetry = 20,
+        /// <summary>
+        /// Download m3u8 ts files.
+        /// </summary>
+        /// <param name="workDir">Set download directory.</param>
+        /// <param name="saveName">Set file save name.</param>
+        /// <param name="parts">Set the parts of m3u8 to download.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="keys">Set m3u8 encryption key.</param>
+        /// <param name="maxThreads">Set the number of threads to download.</param>
+        /// <param name="delay">Set http request delay.(millisecond)</param>
+        /// <param name="maxRetry">Set the maximum number of download retries.</param>
+        /// <param name="maxSpeed">Set the maximum download speed.(byte)
+        /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
+        /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
+        /// <param name="progress">Set progress callback.</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public async Task DownloadAsync(
+            string workDir, string saveName, List<Part> parts,
+            string header = "", Dictionary<string, string>? keys = null,
+            int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
             IProgress<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
+            if (string.IsNullOrWhiteSpace(workDir))
+                throw new Exception("Parameter workDir cannot be empty.");
             if (string.IsNullOrWhiteSpace(saveName))
-                throw new Exception("Not found saveName.");
-            if (!Directory.Exists(workDir))
-                throw new Exception("Not found workDir.");
+                throw new Exception("Parameter saveName cannot be empty.");
+            if (maxSpeed != null && maxSpeed.Value < 1024)
+                throw new Exception("Parameter maxSpeed must be greater than or equal to 1024.");
+
+            if (parts == null ||
+                parts.Count == 0 ||
+                parts.SelectMany(it => it.Segments).Count() == 0)
+                throw new Exception("Parameter parts cannot be empty.");
+
+            saveName = saveName.FilterFileName();
+
+            header = string.IsNullOrWhiteSpace(header) ? "" : header;
+
             var tempDir = Path.Combine(workDir, saveName);
             if (!Directory.Exists(tempDir))
                 Directory.CreateDirectory(tempDir);
@@ -114,6 +221,7 @@ namespace VideoDL_m3u8.DL
             var finish = 0;
             var downloadBytes = 0L;
             var intervalDownloadBytes = 0L;
+            total = works.Count;
 
             async Task<long> copyToAsync(Stream s, Stream d,
                 CancellationToken token = default)
@@ -123,7 +231,7 @@ namespace VideoDL_m3u8.DL
                 var size = 0;
                 var limit = 0L;
                 if (maxSpeed != null)
-                    limit = (long)(0.001 * interval * maxSpeed.Value - maxThreads * 1024);
+                    limit = (long)(0.001 * interval * maxSpeed.Value - threads * 1024);
                 while (true)
                 {
                     size = await s.ReadAsync(buffer, 0, buffer.Length, token);
@@ -146,14 +254,10 @@ namespace VideoDL_m3u8.DL
             {
                 await RetryTask.Run(async (r, ex) =>
                 {
-                    retry = 0;
-                    total = 0;
                     finish = 0;
                     downloadBytes = 0L;
                     intervalDownloadBytes = 0L;
-                    total = works.Count;
                     retry = r;
-                    progressEvent();
 
                     await ParallelTask.Run(works, async (it, _token) =>
                     {
@@ -177,7 +281,6 @@ namespace VideoDL_m3u8.DL
                             var info = new FileInfo(savePath);
                             Interlocked.Add(ref downloadBytes, info.Length);
                             finish++;
-                            progressEvent();
                             return;
                         }
 
@@ -208,7 +311,7 @@ namespace VideoDL_m3u8.DL
                                 File.Move(tempPath, savePath);
                             }, rangeFrom, rangeTo, _token);
                         finish++;
-                    }, maxThreads, delay, token);
+                    }, threads, delay, token);
                 }, 10 * 1024, maxRetry, token);
             }
 
@@ -219,7 +322,7 @@ namespace VideoDL_m3u8.DL
                     if (progress != null)
                     {
                         var time = DateTime.Now;
-                        var percentage = (double)finish / total;
+                        var percentage = Number.Div(finish, total);
                         var totalBytes = (long)Number.Div(downloadBytes * total, finish);
                         var speed = intervalDownloadBytes / interval * 1000;
                         var eta = (int)Number.Div(totalBytes - downloadBytes, speed);
@@ -239,7 +342,7 @@ namespace VideoDL_m3u8.DL
                         progress.Report(args);
                     }
                 }
-                catch (Exception) { }
+                catch { }
             }
 
             var timer = new System.Timers.Timer(interval);
@@ -260,18 +363,32 @@ namespace VideoDL_m3u8.DL
             catch
             {
                 timer.Enabled = false;
+                progressEvent();
                 throw;
             }
         }
 
-        public async Task Merge(string workDir, string saveName, bool cleanTempFile,
-            CancellationToken token = default)
+        /// <summary>
+        /// Merge m3u8 ts files.
+        /// </summary>
+        /// <param name="workDir">Set download directory.</param>
+        /// <param name="saveName">Set file save name.</param>
+        /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public async Task MergeAsync(string workDir, string saveName, 
+            bool clearTempFile, CancellationToken token = default)
         {
-            if(string.IsNullOrWhiteSpace(saveName))
-                throw new Exception("Not found saveName.");
+            if (string.IsNullOrWhiteSpace(workDir))
+                throw new Exception("Parameter workDir cannot be empty.");
+            if (string.IsNullOrWhiteSpace(saveName))
+                throw new Exception("Parameter saveName cannot be empty.");
             var tempDir = Path.Combine(workDir, saveName);
             if (!Directory.Exists(tempDir))
                 throw new Exception("Not found saveName directory.");
+
+            saveName = saveName.FilterFileName();
 
             var parts = Directory.GetDirectories(tempDir)
                 .Select(it => new
@@ -284,7 +401,7 @@ namespace VideoDL_m3u8.DL
                 .ToList();
 
             if (parts.Count == 0)
-                throw new Exception("Not found part directory.");
+                throw new Exception("Directory parts cannot be empty.");
 
             foreach (var part in parts)
             {
@@ -310,7 +427,6 @@ namespace VideoDL_m3u8.DL
 
             var concatPath = Path.Combine(tempDir, $"concat.txt");
             var outputPath = Path.Combine(tempDir, $"output.mp4");
-            var finishPath = Path.Combine(workDir, $"{saveName}.mp4");
             var files = Directory.GetFiles(tempDir)
                 .Where(it => it.EndsWith(".ts"))
                 .OrderBy(it => it)
@@ -340,12 +456,16 @@ namespace VideoDL_m3u8.DL
                 process.Dispose();
             }
 
+            var finishPath = Path.Combine(workDir, $"{saveName}.mp4");
+            if (File.Exists(finishPath))
+                finishPath = Path.Combine(workDir, 
+                    $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.mp4");
             File.Move(outputPath, finishPath);
             File.Delete(concatPath);
             foreach (var file in files)
                 File.Delete(file);
             
-            if (cleanTempFile)
+            if (clearTempFile)
             {
                 try
                 {

@@ -5,7 +5,7 @@ using VideoDL_m3u8.Extensions;
 
 namespace VideoDL_m3u8.Parser
 {
-    public class MediaPlaylistParser: BaseParser
+    internal class MediaPlaylistParser: BaseParser
     {
         // Regex referenced at:
         // https://github.com/videojs/m3u8-parser

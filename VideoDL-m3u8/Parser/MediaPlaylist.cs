@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using VideoDL_m3u8.Extensions;
 
 namespace VideoDL_m3u8.Parser
 {

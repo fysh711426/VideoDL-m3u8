@@ -4,7 +4,7 @@ using VideoDL_m3u8.Extensions;
 
 namespace VideoDL_m3u8.Parser
 {
-    public class MasterPlaylistParser: BaseParser
+    internal class MasterPlaylistParser: BaseParser
     {
         // Regex referenced at:
         // https://github.com/videojs/m3u8-parser
