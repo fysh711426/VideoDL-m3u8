@@ -384,11 +384,12 @@ namespace VideoDL_m3u8.DL
                 throw new Exception("Parameter workDir cannot be empty.");
             if (string.IsNullOrWhiteSpace(saveName))
                 throw new Exception("Parameter saveName cannot be empty.");
+
+            saveName = saveName.FilterFileName();
+
             var tempDir = Path.Combine(workDir, saveName);
             if (!Directory.Exists(tempDir))
                 throw new Exception("Not found saveName directory.");
-
-            saveName = saveName.FilterFileName();
 
             var parts = Directory.GetDirectories(tempDir)
                 .Select(it => new

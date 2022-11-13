@@ -12,8 +12,6 @@ namespace VideoDL_m3u8.Parser
         public int Version { get; set; }
         public string PlaylistType { get; set; } = "";
         public List<Part> Parts { get; set; } = new();
-        //public List<Segment> Segments { get; set; } = new();
-        //public List<SegmentKey> Keys { get; set; } = new();
         public string Manifest { get; set; } = "";
     }
 
