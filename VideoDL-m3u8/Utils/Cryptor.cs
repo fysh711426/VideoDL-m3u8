@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace VideoDL_m3u8.Utils
 {
-    public class Cryptor
+    internal class Cryptor
     {
         public static byte[] HexToBytes(string str)
         {

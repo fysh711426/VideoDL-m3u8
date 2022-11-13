@@ -1,17 +1,17 @@
 ﻿using System;
-using System.Net.Http;
-using System.Threading.Tasks;
-using System.Threading;
 using System.IO;
+using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace VideoDL_m3u8.DL
 {
     public class BaseDL
     {
-        public static readonly string userAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36";
+        protected static readonly string userAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36";
 
-        public void SetRequestHeader(HttpRequestMessage request, string header)
+        protected void SetRequestHeader(HttpRequestMessage request, string header)
         {
             var attrs = header.Split('|', StringSplitOptions.RemoveEmptyEntries);
             foreach (var attr in attrs)
@@ -26,7 +26,7 @@ namespace VideoDL_m3u8.DL
             request.Headers.ConnectionClose = true;
         }
 
-        public async Task<(string data, string url)> GetStringAsync(HttpClient httpClient,
+        protected async Task<(string data, string url)> GetStringAsync(HttpClient httpClient,
             string url, string header, CancellationToken token = default)
         {
             var requestUrl = "";
@@ -49,7 +49,7 @@ namespace VideoDL_m3u8.DL
             return (data, requestUrl != "" ? requestUrl : url);
         }
 
-        public async Task<byte[]> GetBytesAsync(HttpClient httpClient,
+        protected async Task<byte[]> GetBytesAsync(HttpClient httpClient,
             string url, string header, CancellationToken token = default)
         {
             async Task<byte[]> get(string url)
@@ -69,7 +69,7 @@ namespace VideoDL_m3u8.DL
             return await get(url);
         }
 
-        public async Task LoadStreamAsync(HttpClient httpClient, 
+        protected async Task LoadStreamAsync(HttpClient httpClient, 
             string url, string header, Func<Stream, Task> callback,
             long? rangeFrom = null, long? rangeTo = null, 
             CancellationToken token = default)

@@ -374,11 +374,13 @@ namespace VideoDL_m3u8.DL
         /// <param name="workDir">Set download directory.</param>
         /// <param name="saveName">Set file save name.</param>
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
+        /// <param name="onMessage">Set callback function for ffmpeg warning messages.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task MergeAsync(string workDir, string saveName, 
-            bool clearTempFile, CancellationToken token = default)
+        public async Task MergeAsync(string workDir, string saveName,
+            bool clearTempFile = false, Action<string>? onMessage = null,
+            CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(workDir))
                 throw new Exception("Parameter workDir cannot be empty.");
@@ -438,23 +440,26 @@ namespace VideoDL_m3u8.DL
                 .ToString();
             File.WriteAllText(concatPath, fileManifest);
 
-            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc -f mp4 ""{outputPath}"" -loglevel error";
+            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc -f mp4 ""{outputPath}"" -loglevel warning";
             var info = new ProcessStartInfo("ffmpeg", arguments);
             info.UseShellExecute = false;
             info.RedirectStandardError = true;
             var process = Process.Start(info);
             if (process == null)
                 throw new Exception("Process start error.");
+
             try
             {
-                var error = process.StandardError.ReadToEnd();
+                var warning = process.StandardError.ReadToEnd();
                 await process.WaitForExitAsync(token);
-                if (!string.IsNullOrEmpty(error))
-                    throw new Exception(error);
+                process.Dispose();
+                if (!string.IsNullOrEmpty(warning))
+                    onMessage?.Invoke(warning);
             }
-            finally
+            catch
             {
                 process.Dispose();
+                throw;
             }
 
             var finishPath = Path.Combine(workDir, $"{saveName}.mp4");

@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using VideoDL_m3u8.DL;
 using VideoDL_m3u8.Parser;
 
 namespace VideoDL_m3u8.Extensions
@@ -30,54 +28,6 @@ namespace VideoDL_m3u8.Extensions
                 .FirstOrDefault()?
                 .item;
         }
-
-        //public static string CombineUri(this string m3u8Url, string uri)
-        //{
-        //    if (uri.Contains("http"))
-        //        return uri;
-        //    m3u8Url = Regex.Match(m3u8Url, @"(.*?\/)+").Value;
-        //    m3u8Url = m3u8Url.TrimEnd('/');
-
-        //    uri = uri.TrimStart('/');
-        //    var parentUri = Regex.Match(uri, @"(.*?\/)+").Value;
-        //    parentUri = parentUri.TrimEnd('/');
-
-        //    if (parentUri == "")
-        //        return $"{m3u8Url}/{uri}";
-
-        //    var m3u8Splits = m3u8Url
-        //        .Replace("https://", "")
-        //        .Replace("http://", "")
-        //        .Split("/").Reverse().ToList();
-
-        //    var parentSplits = parentUri
-        //        .Split("/").Reverse().ToList();
-
-        //    var repeat = 0;
-        //    var check = true;
-        //    var count = parentSplits.Count;
-        //    for (var i = 0; i < count; i++)
-        //    {
-        //        repeat = 0;
-        //        check = true;
-        //        for (var j = 0; j < count - i; j++)
-        //        {
-        //            if (parentSplits[i+j] != m3u8Splits[j])
-        //            {
-        //                check = false;
-        //                break;
-        //            }
-        //        }
-        //        if (check)
-        //        {
-        //            repeat = count - i;
-        //            break;
-        //        }
-        //    }
-
-        //    uri = string.Join('/', uri.Split("/").Skip(repeat));
-        //    return $"{m3u8Url}/{uri}";
-        //}
 
         public static string CombineUri(this string m3u8Url, string uri)
         {
