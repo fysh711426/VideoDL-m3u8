@@ -13,10 +13,10 @@ namespace VideoDL_m3u8.DL
 
         protected void SetRequestHeader(HttpRequestMessage request, string header)
         {
-            var attrs = header.Split('|', StringSplitOptions.RemoveEmptyEntries);
+            var attrs = header.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var attr in attrs)
             {
-                var split = attr.Split(':', 2);
+                var split = attr.Split(new char[] { ':' }, 2);
                 var key = split[0].Trim();
                 var val = split[1].Trim();
                 request.Headers.Add(key, val);

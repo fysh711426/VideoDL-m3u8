@@ -155,7 +155,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
         /// <param name="keys">Set m3u8 encryption key.</param>
-        /// <param name="maxThreads">Set the number of threads to download.</param>
+        /// <param name="threads">Set the number of threads to download.</param>
         /// <param name="delay">Set http request delay.(millisecond)</param>
         /// <param name="maxRetry">Set the maximum number of download retries.</param>
         /// <param name="maxSpeed">Set the maximum download speed.(byte)
@@ -170,7 +170,7 @@ namespace VideoDL_m3u8.DL
             string header = "", Dictionary<string, string>? keys = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
-            IProgress<ProgressEventArgs>? progress = null,
+            Action<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(workDir))
@@ -180,9 +180,8 @@ namespace VideoDL_m3u8.DL
             if (maxSpeed != null && maxSpeed.Value < 1024)
                 throw new Exception("Parameter maxSpeed must be greater than or equal to 1024.");
 
-            if (parts == null ||
-                parts.Count == 0 ||
-                parts.SelectMany(it => it.Segments).Count() == 0)
+            if (parts == null || 
+                parts.Count == 0 || !parts.SelectMany(it => it.Segments).Any())
                 throw new Exception("Parameter parts cannot be empty.");
 
             saveName = saveName.FilterFileName();
@@ -321,14 +320,12 @@ namespace VideoDL_m3u8.DL
                 {
                     if (progress != null)
                     {
-                        var time = DateTime.Now;
                         var percentage = Number.Div(finish, total);
                         var totalBytes = (long)Number.Div(downloadBytes * total, finish);
                         var speed = intervalDownloadBytes / interval * 1000;
                         var eta = (int)Number.Div(totalBytes - downloadBytes, speed);
                         var args = new ProgressEventArgs
                         {
-                            Time = time,
                             Total = total,
                             Finish = finish,
                             DownloadBytes = downloadBytes,
@@ -339,29 +336,36 @@ namespace VideoDL_m3u8.DL
                             Speed = speed,
                             Eta = eta
                         };
-                        progress.Report(args);
+                        progress(args);
                     }
                 }
                 catch { }
             }
 
+            var stop = false;
             var timer = new System.Timers.Timer(interval);
             timer.AutoReset = true;
             timer.Elapsed += delegate
             {
-                progressEvent();
-                Interlocked.Exchange(ref intervalDownloadBytes, 0);
+                if (!stop)
+                {
+                    progressEvent();
+                    Interlocked.Exchange(ref intervalDownloadBytes, 0);
+                }
             };
 
             try
             {
                 timer.Enabled = true;
-                await func();
+                await func(); 
+                stop = true;
                 timer.Enabled = false;
                 progressEvent();
+                
             }
             catch
             {
+                stop = true;
                 timer.Enabled = false;
                 progressEvent();
                 throw;
@@ -379,7 +383,7 @@ namespace VideoDL_m3u8.DL
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
-            bool clearTempFile = false, Action<string>? onMessage = null,
+            bool clearTempFile = true, Action<string>? onMessage = null,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(workDir))

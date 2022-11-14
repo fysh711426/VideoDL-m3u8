@@ -17,8 +17,7 @@ namespace VideoDL_m3u8.Utils
             if (handler.SupportsAutomaticDecompression)
                 handler.AutomaticDecompression = 
                 DecompressionMethods.GZip | 
-                DecompressionMethods.Deflate |
-                DecompressionMethods.Brotli;
+                DecompressionMethods.Deflate;
 
             return new HttpClient(handler, true);
         });
