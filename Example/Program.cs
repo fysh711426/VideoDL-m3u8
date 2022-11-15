@@ -10,10 +10,13 @@ namespace Example
     {
         public static async Task Main(string[] args)
         {
+            // m3u8 url
             var url = "";
+            // http request header
             var header = "";
-
+            // video save directory
             var workDir = @"D:\Temp";
+            // video save name
             var saveName = "Video";
 
             Console.WriteLine("Start Download...");
@@ -60,7 +63,7 @@ namespace Example
 
             Console.WriteLine("\nStart Merge...");
 
-            // Merge m3u8 ts files by ffmpeg
+            // Merge m3u8 ts files by FFmpeg
             await hlsDL.MergeAsync(workDir, saveName, true,
                 onMessage: (msg) =>
                 {

@@ -149,9 +149,9 @@ namespace VideoDL_m3u8.DL
         /// <summary>
         /// Download m3u8 ts files.
         /// </summary>
-        /// <param name="workDir">Set download directory.</param>
-        /// <param name="saveName">Set file save name.</param>
-        /// <param name="parts">Set the parts of m3u8 to download.</param>
+        /// <param name="workDir">Set video download directory.</param>
+        /// <param name="saveName">Set video save name.</param>
+        /// <param name="parts">Set m3u8 media playlist parts to download.</param>
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
         /// <param name="keys">Set m3u8 encryption key.</param>
@@ -375,10 +375,10 @@ namespace VideoDL_m3u8.DL
         /// <summary>
         /// Merge m3u8 ts files.
         /// </summary>
-        /// <param name="workDir">Set download directory.</param>
-        /// <param name="saveName">Set file save name.</param>
+        /// <param name="workDir">Set video download directory.</param>
+        /// <param name="saveName">Set video save name.</param>
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
-        /// <param name="onMessage">Set callback function for ffmpeg warning messages.</param>
+        /// <param name="onMessage">Set callback function for FFmpeg warning or error messages.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>

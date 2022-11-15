@@ -6,7 +6,7 @@
     <RootNamespace>VideoDL_m3u8</RootNamespace>
     <Authors>fysh711426</Authors>
     <PackageId>VideoDL-m3u8</PackageId>
-    <Description></Description>
+    <Description>This is a m3u8 video downloader which can download ts files and merge to mp4 video using FFmpeg.</Description>
     <Version>1.0.0</Version>
     <PackageProjectUrl>https://github.com/fysh711426/VideoDL-m3u8</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
