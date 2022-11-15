@@ -445,9 +445,11 @@ namespace VideoDL_m3u8.DL
             File.WriteAllText(concatPath, fileManifest);
 
             var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc -f mp4 ""{outputPath}"" -loglevel warning";
-            var info = new ProcessStartInfo("ffmpeg", arguments);
-            info.UseShellExecute = false;
-            info.RedirectStandardError = true;
+            var info = new ProcessStartInfo("ffmpeg", arguments)
+            {
+                UseShellExecute = false,
+                RedirectStandardError = true
+            };
             var process = Process.Start(info);
             if (process == null)
                 throw new Exception("Process start error.");
@@ -455,7 +457,7 @@ namespace VideoDL_m3u8.DL
             try
             {
                 var warning = process.StandardError.ReadToEnd();
-                await process.WaitForExitAsync(token);
+                await process.WaitForExitPatchAsync(token);
                 process.Dispose();
                 if (!string.IsNullOrEmpty(warning))
                     onMessage?.Invoke(warning);

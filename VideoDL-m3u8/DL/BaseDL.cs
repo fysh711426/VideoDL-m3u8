@@ -41,7 +41,9 @@ namespace VideoDL_m3u8.DL
                             return await get(response.Headers.Location.AbsoluteUri);
                         response.EnsureSuccessStatusCode();
                         requestUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
-                        return await response.Content.ReadAsStringAsync(token);
+                        token.ThrowIfCancellationRequested();
+                        // return await response.Content.ReadAsStringAsync(token);
+                        return await response.Content.ReadAsStringAsync();
                     }
                 }
             }
@@ -62,7 +64,9 @@ namespace VideoDL_m3u8.DL
                         if (response.Headers.Location != null)
                             return await get(response.Headers.Location.AbsoluteUri);
                         response.EnsureSuccessStatusCode();
-                        return await response.Content.ReadAsByteArrayAsync(token);
+                        token.ThrowIfCancellationRequested();
+                        // return await response.Content.ReadAsByteArrayAsync(token);
+                        return await response.Content.ReadAsByteArrayAsync();
                     }
                 }
             }
@@ -91,7 +95,9 @@ namespace VideoDL_m3u8.DL
                             return;
                         }
                         response.EnsureSuccessStatusCode();
-                        using (var stream = await response.Content.ReadAsStreamAsync(token))
+                        token.ThrowIfCancellationRequested();
+                        // using (var stream = await response.Content.ReadAsStreamAsync(token))
+                        using (var stream = await response.Content.ReadAsStreamAsync())
                         {
                             await callback(stream);
                         }
