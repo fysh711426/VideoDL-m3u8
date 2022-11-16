@@ -2,6 +2,17 @@
 
 This is a m3u8 video downloader which can download ts files and merge to mp4 video using FFmpeg.  
 
+* Support m3u8 manifest parsing  
+* Support .ts file download  
+* Support FFmpeg to merge .ts files  
+* Support AES-128 decryption  
+* Support custom http header  
+* Support multi-thread download  
+* Support download speed limit  
+* Support resuming from breakpoint  
+* Support png header detection (undone)  
+* Support http proxy (undone)  
+
 ---  
 
 ### Nuget install  
@@ -103,6 +114,7 @@ Console.ReadLine();
 ### Documentation  
 
 ```C#
+// Download m3u8 ts files
 public async Task DownloadAsync(
     string workDir, 
     string saveName, 
@@ -159,6 +171,7 @@ public async Task DownloadAsync(
 ---  
 
 ```C#
+// Merge m3u8 ts files
 public async Task MergeAsync(
     string workDir, 
     string saveName,
