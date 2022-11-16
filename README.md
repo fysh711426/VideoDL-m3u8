@@ -4,12 +4,12 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 
 * Support m3u8 manifest parsing  
 * Support .ts file download  
-* Support FFmpeg to merge .ts files  
 * Support AES-128 decryption  
 * Support custom http header  
 * Support multi-thread download  
 * Support download speed limit  
 * Support resuming from breakpoint  
+* Support FFmpeg to merge .ts files  
 * Support png header detection (undone)  
 * Support http proxy (undone)  
 
