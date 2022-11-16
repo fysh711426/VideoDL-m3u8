@@ -22,9 +22,18 @@ namespace VideoDL_m3u8.DL
         /// Init HlsDL.
         /// </summary>
         /// <param name="timeout">Set http request timeout.(millisecond)</param>
-        public HlsDL(int timeout = 6000) 
-            : this(Http.Client, timeout)
+        /// <param name="proxy">Set http or socks5 proxy.
+        /// http://{hostname}:{port} or socks5://{hostname}:{port}</param>
+        public HlsDL(int timeout = 6000, string? proxy = null)
+            : this(CreateHttpClient(proxy), timeout)
         {
+        }
+
+        private static HttpClient CreateHttpClient(string? proxy)
+        {
+            if (proxy == null)
+                return Http.Client;
+            return Http.GetClient(proxy);
         }
 
         /// <summary>

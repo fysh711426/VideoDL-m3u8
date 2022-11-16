@@ -41,5 +41,9 @@
       <_Parameter1>Test</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="HttpToSocks5Proxy" Version="1.4.0" />
+  </ItemGroup>
 
 </Project>

@@ -11,7 +11,7 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 * Support resuming from breakpoint  
 * Support FFmpeg to merge .ts files  
 * Support png header detection (undone)  
-* Support http proxy (undone)  
+* Support http or socks5 proxy  
 
 ---  
 
@@ -107,6 +107,18 @@ await hlsDL.MergeAsync(workDir, saveName, true,
     });
 Console.WriteLine("Finish.");
 Console.ReadLine();
+```
+
+---  
+
+### Proxy example  
+
+```C#
+var hlsDL = new HlsDL(
+    proxy: "http://127.0.0.1:8000");
+// or
+var hlsDL = new HlsDL(
+    proxy: "socks5://127.0.0.1:8000");
 ```
 
 ---  
