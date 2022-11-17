@@ -170,6 +170,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="maxSpeed">Set the maximum download speed.(byte)
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
+        /// <param name="onSegment">Set segment download callback.</param>
         /// <param name="progress">Set progress callback.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
@@ -179,6 +180,7 @@ namespace VideoDL_m3u8.DL
             string header = "", Dictionary<string, string>? keys = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
+            Func<MemoryStream, Task<Stream>>? onSegment = null,
             Action<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
@@ -293,27 +295,59 @@ namespace VideoDL_m3u8.DL
                         }
 
                         await LoadStreamAsync(_httpClient, segment.Uri, header,
-                            async (stream) =>
+                            async (stream, contentLength) =>
                             {
                                 using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                 {
+                                    async Task download(Stream dest)
+                                    {
+                                        var size = await copyToAsync(stream, dest, _token);
+                                        if (contentLength != null)
+                                        {
+                                            if (size != contentLength)
+                                                throw new Exception("Segment size not match content-length.");
+                                        }
+                                        Interlocked.Add(ref downloadBytes, size);
+                                    }
                                     if (segment.Key.Method != "NONE")
                                     {
                                         if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
                                             string.IsNullOrEmpty(key))
                                             throw new Exception("Not found segment key.");
                                         var iv = segment.Key.IV;
+
                                         var ms = new MemoryStream();
-                                        var size = await copyToAsync(stream, ms, _token);
-                                        Interlocked.Add(ref downloadBytes, size);
+                                        await download(ms);
                                         ms.Position = 0;
-                                        var cryptor = new Cryptor();
-                                        await cryptor.AES128Decrypt(ms, key, iv, fs, _token);
+                                        if (onSegment != null)
+                                        {
+                                            var decryptStream = new MemoryStream();
+                                            await new Cryptor()
+                                                .AES128Decrypt(ms, key, iv, decryptStream, _token);
+                                            decryptStream.Position = 0;
+                                            var result = await onSegment(decryptStream);
+                                            await fs.CopyToAsync(result, 4096, _token);
+                                        }    
+                                        else
+                                        {
+                                            await new Cryptor()
+                                                .AES128Decrypt(ms, key, iv, fs, _token);
+                                        }
                                     }
                                     else
                                     {
-                                        var size = await copyToAsync(stream, fs, _token);
-                                        Interlocked.Add(ref downloadBytes, size);
+                                        if (onSegment != null)
+                                        {
+                                            var ms = new MemoryStream();
+                                            await download(ms);
+                                            ms.Position = 0;
+                                            var result = await onSegment(ms);
+                                            await fs.CopyToAsync(result, 4096, _token);
+                                        }
+                                        else
+                                        {
+                                            await download(fs);
+                                        }
                                     }
                                 }
                                 File.Move(tempPath, savePath);

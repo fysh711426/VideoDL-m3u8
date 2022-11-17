@@ -74,7 +74,7 @@ namespace VideoDL_m3u8.DL
         }
 
         protected async Task LoadStreamAsync(HttpClient httpClient, 
-            string url, string header, Func<Stream, Task> callback,
+            string url, string header, Func<Stream, long?, Task> callback,
             long? rangeFrom = null, long? rangeTo = null, 
             CancellationToken token = default)
         {
@@ -99,7 +99,7 @@ namespace VideoDL_m3u8.DL
                         // using (var stream = await response.Content.ReadAsStreamAsync(token))
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         {
-                            await callback(stream);
+                            await callback(stream, response.Content.Headers.ContentLength);
                         }
                     }
                 }
