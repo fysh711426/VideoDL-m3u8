@@ -180,7 +180,7 @@ namespace VideoDL_m3u8.DL
             string header = "", Dictionary<string, string>? keys = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
-            Func<MemoryStream, Task<Stream>>? onSegment = null,
+            Func<Stream, Task<Stream>>? onSegment = null,
             Action<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
@@ -299,16 +299,20 @@ namespace VideoDL_m3u8.DL
                             {
                                 using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                 {
-                                    async Task download(Stream dest)
+                                    async Task<Stream> download()
                                     {
-                                        var size = await copyToAsync(stream, dest, _token);
+                                        var ms = new MemoryStream();
+                                        var size = await copyToAsync(stream, ms, _token);
                                         if (contentLength != null)
                                         {
                                             if (size != contentLength)
                                                 throw new Exception("Segment size not match content-length.");
                                         }
                                         Interlocked.Add(ref downloadBytes, size);
+                                        ms.Position = 0;
+                                        return ms;
                                     }
+
                                     if (segment.Key.Method != "NONE")
                                     {
                                         if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
@@ -316,37 +320,33 @@ namespace VideoDL_m3u8.DL
                                             throw new Exception("Not found segment key.");
                                         var iv = segment.Key.IV;
 
-                                        var ms = new MemoryStream();
-                                        await download(ms);
-                                        ms.Position = 0;
+                                        var ms = await download();
                                         if (onSegment != null)
                                         {
                                             var decryptStream = new MemoryStream();
-                                            await new Cryptor()
-                                                .AES128Decrypt(ms, key, iv, decryptStream, _token);
+                                            await new Cryptor().AES128Decrypt(
+                                                ms, key, iv, decryptStream, _token);
                                             decryptStream.Position = 0;
-                                            var result = await onSegment(decryptStream);
-                                            await fs.CopyToAsync(result, 4096, _token);
-                                        }    
+                                            ms = await onSegment(decryptStream);
+                                            await ms.CopyToAsync(fs, 4096, _token);
+                                        }
                                         else
                                         {
-                                            await new Cryptor()
-                                                .AES128Decrypt(ms, key, iv, fs, _token);
+                                            await new Cryptor().AES128Decrypt(
+                                                ms, key, iv, fs, _token);
                                         }
                                     }
                                     else
                                     {
+                                        var ms = await download();
                                         if (onSegment != null)
                                         {
-                                            var ms = new MemoryStream();
-                                            await download(ms);
-                                            ms.Position = 0;
-                                            var result = await onSegment(ms);
-                                            await fs.CopyToAsync(result, 4096, _token);
+                                            ms = await onSegment(ms);
+                                            await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                         else
                                         {
-                                            await download(fs);
+                                            await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                     }
                                 }
@@ -397,10 +397,28 @@ namespace VideoDL_m3u8.DL
                 }
             };
 
+            void checkComplete()
+            {
+                var count = 0;
+                var partDirs = Directory.GetDirectories(tempDir);
+                foreach (var partDir in partDirs)
+                {
+                    var partDirName = Path.GetFileName(partDir);
+                    if (!partDirName.StartsWith("Part_"))
+                        continue;
+                    var partFiles = Directory.GetFiles(partDir)
+                        .Where(it => it.EndsWith(".ts"));
+                    count += partFiles.Count();
+                }
+                if (count != works.Count)
+                    throw new Exception("Segment count not match.");
+            }
+
             try
             {
                 timer.Enabled = true;
-                await func(); 
+                await func();
+                checkComplete();
                 stop = true;
                 timer.Enabled = false;
                 progressEvent();
