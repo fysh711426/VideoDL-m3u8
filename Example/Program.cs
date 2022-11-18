@@ -54,6 +54,11 @@ namespace Example
             await hlsDL.DownloadAsync(workDir, saveName,
                 mediaPlaylist.Parts, header, keys,
                 threads: 4, maxSpeed: 5 * 1024 * 1024,
+                onSegment: async (ms, token) =>
+                {
+                    // Detect and skip png header
+                    return await ms.TrySkipPngHeaderAsync(token);
+                },
                 progress: (args) =>
                 {
                     var print = args.Format;
