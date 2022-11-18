@@ -180,7 +180,7 @@ namespace VideoDL_m3u8.DL
             string header = "", Dictionary<string, string>? keys = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
-            Func<Stream, Task<Stream>>? onSegment = null,
+            Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
             Action<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
@@ -327,7 +327,7 @@ namespace VideoDL_m3u8.DL
                                             await new Cryptor().AES128Decrypt(
                                                 ms, key, iv, decryptStream, _token);
                                             decryptStream.Position = 0;
-                                            ms = await onSegment(decryptStream);
+                                            ms = await onSegment(decryptStream, _token);
                                             await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                         else
@@ -341,7 +341,7 @@ namespace VideoDL_m3u8.DL
                                         var ms = await download();
                                         if (onSegment != null)
                                         {
-                                            ms = await onSegment(ms);
+                                            ms = await onSegment(ms, _token);
                                             await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                         else

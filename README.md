@@ -10,8 +10,13 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 * Support download speed limit  
 * Support resuming from breakpoint  
 * Support FFmpeg to merge .ts files  
-* Support png header detection (undone)  
+* Support png header detection  
 * Support http or socks5 proxy  
+* Support video format conversion (undone)  
+* Support m3u8 byte range  
+* Support m3u8 map tag (undone)  
+* Support mpd manifest parsing (undone)  
+* Support live stream record (undone)  
 
 ---  
 
@@ -88,6 +93,11 @@ if (keyUrls.Count > 0)
 await hlsDL.DownloadAsync(workDir, saveName,
     mediaPlaylist.Parts, header, keys,
     threads: 4, maxSpeed: 5 * 1024 * 1024,
+    onSegment: async (ms, token) =>
+    {
+        // Detect and skip png header
+        return await ms.TrySkipPngHeaderAsync(token);
+    },
     progress: (args) =>
     {
         var print = args.Format;

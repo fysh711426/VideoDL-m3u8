@@ -58,6 +58,7 @@ namespace VideoDL_m3u8.Utils
                 {
                     try
                     {
+                        cts.Cancel();
                         await Task.WhenAll(tasks.ToArray());
                     }
                     catch { }
