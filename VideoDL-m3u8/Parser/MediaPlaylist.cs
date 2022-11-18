@@ -49,5 +49,6 @@ namespace VideoDL_m3u8.Parser
     {
         public string Uri { get; set; } = "";
         public ByteRange? ByteRange { get; set; }
+        public SegmentKey Key { get; set; } = new();
     }
 }

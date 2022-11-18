@@ -36,14 +36,10 @@ namespace VideoDL_m3u8.Parser
 
                     if (!line.StartsWith("#"))
                     {
-                        if (key.Method != "NONE" && key.IV == "")
-                        {
-                            var index16 = Convert.ToString(segment.Index, 16);
-                            key.IV = $"0x{index16.PadLeft(32, '0')}";
-                        }
                         segment.Uri = string.IsNullOrEmpty(m3u8Url) ?
                             line : m3u8Url.CombineUri(line);
-                        segment.Key = key;
+
+                        // Set byte range
                         if (byteRange != null)
                         {
                             segment.ByteRange = byteRange;
@@ -53,7 +49,20 @@ namespace VideoDL_m3u8.Parser
                         {
                             segment.SegmentMap = segmentMap;
                         }
-                        //playlist.Segments.Add(segment);
+
+                        // Set key
+                        segment.Key = new SegmentKey
+                        {
+                            Method = key.Method,
+                            Uri = key.Uri,
+                            IV = key.IV
+                        };
+                        if (key.Method != "NONE" && key.IV == "")
+                        {
+                            var index16 = Convert.ToString(segment.Index, 16);
+                            segment.Key.IV = $"0x{index16.PadLeft(32, '0')}";
+                        }
+
                         part.Segments.Add(segment);
                         segment = new Segment();
                         continue;
@@ -148,7 +157,6 @@ namespace VideoDL_m3u8.Parser
                             if (attrs.ContainsKey("IV"))
                                 key.IV = attrs["IV"];
                         }
-                        //playlist.Keys.Add(key);
                         continue;
                     }
                     match = Regex.Match(line, @"^#EXT-X-BYTERANGE:(.*)?$");
@@ -182,6 +190,8 @@ namespace VideoDL_m3u8.Parser
                             if (attrs.ContainsKey("URI"))
                                 segmentMap.Uri = string.IsNullOrEmpty(m3u8Url) ?
                                     attrs["URI"] : m3u8Url.CombineUri(attrs["URI"]);
+
+                            // Set byte range
                             if (attrs.ContainsKey("BYTERANGE"))
                             {
                                 var val = attrs["BYTERANGE"];
@@ -197,6 +207,20 @@ namespace VideoDL_m3u8.Parser
                                         mapByteRange.Offset = int.Parse(offset);
                                 }
                                 segmentMap.ByteRange = mapByteRange;
+                            }
+
+                            // Set key
+                            segmentMap.Key = new SegmentKey
+                            {
+                                Method = key.Method,
+                                Uri = key.Uri,
+                                IV = key.IV
+                            };
+                            if (key.Method != "NONE" && key.IV == "")
+                            {
+                                // Undefined behavior
+                                var index16 = Convert.ToString(segment.Index, 16);
+                                segmentMap.Key.IV = $"0x{index16.PadLeft(32, '0')}";
                             }
                         }
                         continue;

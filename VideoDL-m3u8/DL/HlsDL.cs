@@ -126,7 +126,14 @@ namespace VideoDL_m3u8.DL
         {
             return parts
                 .SelectMany(it => it.Segments)
-                .Select(it => it.Key)
+                .SelectMany(it =>
+                {
+                    var append = new List<SegmentKey>();
+                    append.Add(it.Key);
+                    if (it.SegmentMap != null)
+                        append.Add(it.SegmentMap.Key);
+                    return append;
+                })
                 .Where(it => it.Method != "NONE")
                 .Select(it => it.Uri)
                 .Distinct()
