@@ -51,13 +51,17 @@ namespace VideoDL_m3u8.DL
             return (data, requestUrl != "" ? requestUrl : url);
         }
 
-        protected async Task<byte[]> GetBytesAsync(HttpClient httpClient,
-            string url, string header, CancellationToken token = default)
+        protected async Task<byte[]> GetBytesAsync(
+            HttpClient httpClient, string url, string header, 
+            long? rangeFrom = null, long? rangeTo = null,
+            CancellationToken token = default)
         {
             async Task<byte[]> get(string url)
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
                 {
+                    if (rangeFrom != null || rangeTo != null)
+                        request.Headers.Range = new RangeHeaderValue(rangeFrom, rangeTo);
                     SetRequestHeader(request, header);
                     using (var response = await httpClient.SendAsync(request, token))
                     {
@@ -75,7 +79,7 @@ namespace VideoDL_m3u8.DL
 
         protected async Task LoadStreamAsync(HttpClient httpClient, 
             string url, string header, Func<Stream, long?, Task> callback,
-            long? rangeFrom = null, long? rangeTo = null, 
+            long? rangeFrom = null, long? rangeTo = null,
             CancellationToken token = default)
         {
             async Task load(string url)

@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using VideoDL_m3u8.Events;
 using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
@@ -24,7 +25,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="timeout">Set http request timeout.(millisecond)</param>
         /// <param name="proxy">Set http or socks5 proxy.
         /// http://{hostname}:{port} or socks5://{hostname}:{port}</param>
-        public HlsDL(int timeout = 6000, string? proxy = null)
+        public HlsDL(int timeout = 60000, string? proxy = null)
             : this(CreateHttpClient(proxy), timeout)
         {
         }
@@ -41,7 +42,7 @@ namespace VideoDL_m3u8.DL
         /// </summary>
         /// <param name="httpClient">Set http client.</param>
         /// <param name="timeout">Set http request timeout.(millisecond)</param>
-        public HlsDL(HttpClient httpClient, int timeout = 6000)
+        public HlsDL(HttpClient httpClient, int timeout = 60000)
         {
             _httpClient = httpClient;
             _httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
@@ -118,46 +119,105 @@ namespace VideoDL_m3u8.DL
         }
 
         /// <summary>
-        /// Get m3u8 keys url by parts.
+        /// Get m3u8 segment keys by parts.
         /// </summary>
         /// <param name="parts">Set m3u8 playlist parts.</param>
         /// <returns></returns>
-        public List<string> GetKeyUrls(List<Part> parts)
+        public List<SegmentKey> GetKeys(List<Part> parts)
         {
-            return parts
-                .SelectMany(it => it.Segments)
-                .SelectMany(it =>
+            var keys = new List<SegmentKey>();
+            var segments = parts.SelectMany(it => it.Segments);
+            foreach (var item in segments)
+            {
+                if (item.Key.Method != "NONE")
                 {
-                    var append = new List<SegmentKey>();
-                    append.Add(it.Key);
-                    if (it.SegmentMap != null)
-                        append.Add(it.SegmentMap.Key);
-                    return append;
-                })
-                .Where(it => it.Method != "NONE")
-                .Select(it => it.Uri)
-                .Distinct()
-                .ToList();
+                    keys.Add(item.Key);
+                    if (item.SegmentMap != null)
+                        keys.Add(item.SegmentMap.Key);
+                }
+            }
+            return keys.Distinct(it => it.Uri).ToList();
         }
 
         /// <summary>
-        /// Get m3u8 keys by urls.
+        /// Get m3u8 key data by segment key.
         /// </summary>
-        /// <param name="keyUrls">Set m3u8 keys url.</param>
+        /// <param name="segmentKeys">Set m3u8 segment keys.</param>
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
-        public async Task<Dictionary<string, string>> GetKeysAsync(
-            List<string> keyUrls, string header = "",
+        public async Task<Dictionary<string, string>> GetKeysDataAsync(
+            List<SegmentKey> segmentKeys, string header = "",
             CancellationToken token = default)
         {
             var result = new Dictionary<string, string>();
-            foreach (var url in keyUrls)
+            foreach (var item in segmentKeys)
             {
-                var data = await GetBytesAsync(_httpClient, url, header, token);
+                var data = await GetBytesAsync(_httpClient,
+                    item.Uri, header, null, null, token);
                 var key = Convert.ToBase64String(data);
-                result.Add(url, key);
+                result.Add(item.Uri, key);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Get m3u8 segment maps by parts.
+        /// </summary>
+        /// <param name="parts">Set m3u8 playlist parts.</param>
+        /// <returns></returns>
+        public List<SegmentMap> GetMaps(List<Part> parts)
+        {
+            var maps = new List<SegmentMap>();
+            var segments = parts.SelectMany(it => it.Segments);
+            foreach (var item in segments)
+            {
+                if (item.SegmentMap != null)
+                    maps.Add(item.SegmentMap);
+            }
+            return maps.Distinct(it => it.Uri).ToList();
+        }
+
+        /// <summary>
+        /// Get m3u8 map data by segment map.
+        /// </summary>
+        /// <param name="segmentMaps">Set m3u8 segment maps.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="keys">Set m3u8 segment keys.</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task<Dictionary<string, byte[]>> GetMapsDataAsync(
+            List<SegmentMap> segmentMaps, string header = "",
+            Dictionary<string, string>? keys = null,
+            CancellationToken token = default)
+        {
+            keys = keys ?? new Dictionary<string, string>();
+
+            var result = new Dictionary<string, byte[]>();
+            foreach (var item in segmentMaps)
+            {
+                var rangeFrom = null as long?;
+                var rangeTo = null as long?;
+                if (item.ByteRange != null)
+                {
+                    rangeFrom = item.ByteRange.Offset ?? 0;
+                    rangeTo = rangeFrom + item.ByteRange.Length - 1;
+                }
+                var data = await GetBytesAsync(_httpClient,
+                    item.Uri, header, rangeFrom, rangeTo, token);
+                
+                if (item.Key.Method != "NONE")
+                {
+                    if (!keys.TryGetValue(item.Key.Uri, out var key))
+                        throw new Exception("Not found segment key.");
+                    var decrypt = new MemoryStream();
+                    await new Cryptor().AES128Decrypt(new MemoryStream(data), 
+                        key, item.Key.IV, decrypt, token);
+                    data = decrypt.ToArray();
+                }
+                result.Add(item.Uri, data);
             }
             return result;
         }
@@ -170,7 +230,8 @@ namespace VideoDL_m3u8.DL
         /// <param name="parts">Set m3u8 media playlist parts to download.</param>
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
-        /// <param name="keys">Set m3u8 encryption key.</param>
+        /// <param name="keys">Set m3u8 segment keys.</param>
+        /// <param name="maps">Set m3u8 segment maps.</param>
         /// <param name="threads">Set the number of threads to download.</param>
         /// <param name="delay">Set http request delay.(millisecond)</param>
         /// <param name="maxRetry">Set the maximum number of download retries.</param>
@@ -183,8 +244,10 @@ namespace VideoDL_m3u8.DL
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public async Task DownloadAsync(
-            string workDir, string saveName, List<Part> parts,
-            string header = "", Dictionary<string, string>? keys = null,
+            string workDir, string saveName, 
+            List<Part> parts, string header = "",
+            Dictionary<string, string>? keys = null,
+            Dictionary<string, byte[]>? maps = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
             Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
@@ -201,6 +264,9 @@ namespace VideoDL_m3u8.DL
             if (parts == null || 
                 parts.Count == 0 || !parts.SelectMany(it => it.Segments).Any())
                 throw new Exception("Parameter parts cannot be empty.");
+
+            keys = keys ?? new Dictionary<string, string>();
+            maps = maps ?? new Dictionary<string, byte[]>();
 
             saveName = saveName.FilterFileName();
 
@@ -244,7 +310,7 @@ namespace VideoDL_m3u8.DL
                 CancellationToken token = default)
             {
                 var bytes = 0L;
-                var buffer = new byte[1024];
+                var buffer = new byte[4096];
                 var size = 0;
                 var limit = 0L;
                 if (maxSpeed != null)
@@ -276,7 +342,22 @@ namespace VideoDL_m3u8.DL
                     intervalDownloadBytes = 0L;
                     retry = r;
 
-                    await ParallelTask.Run(works, async (it, _token) =>
+                    var todoWorks = works
+                        .Where(it =>
+                        {
+                            var savePath = $"{it.filePath}.ts";
+                            if (File.Exists(savePath))
+                            {
+                                var info = new FileInfo(savePath);
+                                downloadBytes += info.Length;
+                                finish++;
+                                return false;
+                            }
+                            return true;
+                        })
+                        .ToList();
+
+                    await ParallelTask.Run(todoWorks, async (it, _token) =>
                     {
                         var index = it.index;
                         var filePath = it.filePath;
@@ -292,14 +373,6 @@ namespace VideoDL_m3u8.DL
 
                         var tempPath = $"{filePath}.downloading";
                         var savePath = $"{filePath}.ts";
-
-                        if (File.Exists(savePath))
-                        {
-                            var info = new FileInfo(savePath);
-                            Interlocked.Add(ref downloadBytes, info.Length);
-                            finish++;
-                            return;
-                        }
 
                         await LoadStreamAsync(_httpClient, segment.Uri, header,
                             async (stream, contentLength) =>
@@ -320,10 +393,16 @@ namespace VideoDL_m3u8.DL
                                         return ms;
                                     }
 
+                                    if (segment.SegmentMap != null)
+                                    {
+                                        if (!maps.TryGetValue(segment.SegmentMap.Uri, out var map))
+                                            throw new Exception("Not found segment map.");
+                                        await fs.WriteAsync(map, 0, map.Length, _token);
+                                    }
+                                    
                                     if (segment.Key.Method != "NONE")
                                     {
-                                        if (keys?.TryGetValue(segment.Key.Uri, out var key) != true ||
-                                            string.IsNullOrEmpty(key))
+                                        if (!keys.TryGetValue(segment.Key.Uri, out var key))
                                             throw new Exception("Not found segment key.");
                                         var iv = segment.Key.IV;
 
