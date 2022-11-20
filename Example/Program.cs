@@ -44,11 +44,11 @@ namespace Example
             // Parse m3u8 manifest to media playlist
             var mediaPlaylist = hlsDL.ParseMediaPlaylist(manifest, m3u8Url);
 
-            // Download m3u8 encryption key
+            // Download m3u8 segment key
             var keys = null as Dictionary<string, string>;
-            var keyUrls = hlsDL.GetKeyUrls(mediaPlaylist.Parts);
-            if (keyUrls.Count > 0)
-                keys = await hlsDL.GetKeysAsync(keyUrls, header);
+            var segmentKeys = hlsDL.GetKeys(mediaPlaylist.Parts);
+            if (segmentKeys.Count > 0)
+                keys = await hlsDL.GetKeysDataAsync(segmentKeys, header);
 
             // Download m3u8 ts files
             await hlsDL.DownloadAsync(workDir, saveName,

@@ -7,7 +7,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using VideoDL_m3u8.Events;
 using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
@@ -15,7 +14,7 @@ using VideoDL_m3u8.Utils;
 
 namespace VideoDL_m3u8.DL
 {
-    public class HlsDL: BaseDL
+    public class HlsDL : BaseDL
     {
         protected readonly HttpClient _httpClient;
 
@@ -126,21 +125,24 @@ namespace VideoDL_m3u8.DL
         public List<SegmentKey> GetKeys(List<Part> parts)
         {
             var keys = new List<SegmentKey>();
-            var segments = parts.SelectMany(it => it.Segments);
-            foreach (var item in segments)
+            foreach (var part in parts)
             {
-                if (item.Key.Method != "NONE")
+                if (part.SegmentMap != null)
                 {
-                    keys.Add(item.Key);
-                    if (item.SegmentMap != null)
-                        keys.Add(item.SegmentMap.Key);
+                    if (part.SegmentMap.Key.Method != "NONE")
+                        keys.Add(part.SegmentMap.Key);
+                }
+                foreach (var item in part.Segments)
+                {
+                    if (item.Key.Method != "NONE")
+                        keys.Add(item.Key);
                 }
             }
             return keys.Distinct(it => it.Uri).ToList();
         }
 
         /// <summary>
-        /// Get m3u8 key data by segment key.
+        /// Get m3u8 key base64 data by segment key.
         /// </summary>
         /// <param name="segmentKeys">Set m3u8 segment keys.</param>
         /// <param name="header">Set http request header.
@@ -163,66 +165,6 @@ namespace VideoDL_m3u8.DL
         }
 
         /// <summary>
-        /// Get m3u8 segment maps by parts.
-        /// </summary>
-        /// <param name="parts">Set m3u8 playlist parts.</param>
-        /// <returns></returns>
-        public List<SegmentMap> GetMaps(List<Part> parts)
-        {
-            var maps = new List<SegmentMap>();
-            var segments = parts.SelectMany(it => it.Segments);
-            foreach (var item in segments)
-            {
-                if (item.SegmentMap != null)
-                    maps.Add(item.SegmentMap);
-            }
-            return maps.Distinct(it => it.Uri).ToList();
-        }
-
-        /// <summary>
-        /// Get m3u8 map data by segment map.
-        /// </summary>
-        /// <param name="segmentMaps">Set m3u8 segment maps.</param>
-        /// <param name="header">Set http request header.
-        /// format: key1:key1|key2:key2</param>
-        /// <param name="keys">Set m3u8 segment keys.</param>
-        /// <param name="token">Set cancellation token.</param>
-        /// <returns></returns>
-        public async Task<Dictionary<string, byte[]>> GetMapsDataAsync(
-            List<SegmentMap> segmentMaps, string header = "",
-            Dictionary<string, string>? keys = null,
-            CancellationToken token = default)
-        {
-            keys = keys ?? new Dictionary<string, string>();
-
-            var result = new Dictionary<string, byte[]>();
-            foreach (var item in segmentMaps)
-            {
-                var rangeFrom = null as long?;
-                var rangeTo = null as long?;
-                if (item.ByteRange != null)
-                {
-                    rangeFrom = item.ByteRange.Offset ?? 0;
-                    rangeTo = rangeFrom + item.ByteRange.Length - 1;
-                }
-                var data = await GetBytesAsync(_httpClient,
-                    item.Uri, header, rangeFrom, rangeTo, token);
-                
-                if (item.Key.Method != "NONE")
-                {
-                    if (!keys.TryGetValue(item.Key.Uri, out var key))
-                        throw new Exception("Not found segment key.");
-                    var decrypt = new MemoryStream();
-                    await new Cryptor().AES128Decrypt(new MemoryStream(data), 
-                        key, item.Key.IV, decrypt, token);
-                    data = decrypt.ToArray();
-                }
-                result.Add(item.Uri, data);
-            }
-            return result;
-        }
-
-        /// <summary>
         /// Download m3u8 ts files.
         /// </summary>
         /// <param name="workDir">Set video download directory.</param>
@@ -231,7 +173,6 @@ namespace VideoDL_m3u8.DL
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
         /// <param name="keys">Set m3u8 segment keys.</param>
-        /// <param name="maps">Set m3u8 segment maps.</param>
         /// <param name="threads">Set the number of threads to download.</param>
         /// <param name="delay">Set http request delay.(millisecond)</param>
         /// <param name="maxRetry">Set the maximum number of download retries.</param>
@@ -244,10 +185,9 @@ namespace VideoDL_m3u8.DL
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public async Task DownloadAsync(
-            string workDir, string saveName, 
+            string workDir, string saveName,
             List<Part> parts, string header = "",
             Dictionary<string, string>? keys = null,
-            Dictionary<string, byte[]>? maps = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
             long? maxSpeed = null, int interval = 1000,
             Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
@@ -261,12 +201,11 @@ namespace VideoDL_m3u8.DL
             if (maxSpeed != null && maxSpeed.Value < 1024)
                 throw new Exception("Parameter maxSpeed must be greater than or equal to 1024.");
 
-            if (parts == null || 
+            if (parts == null ||
                 parts.Count == 0 || !parts.SelectMany(it => it.Segments).Any())
                 throw new Exception("Parameter parts cannot be empty.");
 
             keys = keys ?? new Dictionary<string, string>();
-            maps = maps ?? new Dictionary<string, byte[]>();
 
             saveName = saveName.FilterFileName();
 
@@ -276,8 +215,8 @@ namespace VideoDL_m3u8.DL
             if (!Directory.Exists(tempDir))
                 Directory.CreateDirectory(tempDir);
 
-            var works = 
-                new List<(int index, string filePath, Segment segment)>();
+            var works = new List<(int index, string filePath, string ext,
+                (string Uri, ByteRange? ByteRange, SegmentKey Key) segment)>();
 
             var partIndex = 0;
             foreach (var part in parts)
@@ -289,11 +228,25 @@ namespace VideoDL_m3u8.DL
                 if (!Directory.Exists(partDir))
                     Directory.CreateDirectory(partDir);
 
+                var hasMap = false;
+                if (part.SegmentMap != null)
+                {
+                    var mapName = "!MAP";
+                    var mapPath = Path.Combine(partDir, mapName);
+                    works.Add((index, mapPath, ".mp4",
+                        (part.SegmentMap.Uri,
+                         part.SegmentMap.ByteRange,
+                         part.SegmentMap.Key)));
+                    hasMap = true;
+                }
+
                 foreach (var item in part.Segments)
                 {
+                    var ext = hasMap ? ".m4s" : ".ts";
                     var fileName = $"{index}".PadLeft($"{count}".Length, '0');
                     var filePath = Path.Combine(partDir, $"{fileName}");
-                    works.Add((index, filePath, item));
+                    works.Add((index, filePath, ext,
+                        (item.Uri, item.ByteRange, item.Key)));
                     index++;
                 }
                 partIndex++;
@@ -345,7 +298,7 @@ namespace VideoDL_m3u8.DL
                     var todoWorks = works
                         .Where(it =>
                         {
-                            var savePath = $"{it.filePath}.ts";
+                            var savePath = $"{it.filePath}{it.ext}";
                             if (File.Exists(savePath))
                             {
                                 var info = new FileInfo(savePath);
@@ -361,6 +314,7 @@ namespace VideoDL_m3u8.DL
                     {
                         var index = it.index;
                         var filePath = it.filePath;
+                        var ext = it.ext;
                         var segment = it.segment;
 
                         var rangeFrom = null as long?;
@@ -372,7 +326,7 @@ namespace VideoDL_m3u8.DL
                         }
 
                         var tempPath = $"{filePath}.downloading";
-                        var savePath = $"{filePath}.ts";
+                        var savePath = $"{filePath}{ext}";
 
                         await LoadStreamAsync(_httpClient, segment.Uri, header,
                             async (stream, contentLength) =>
@@ -393,13 +347,6 @@ namespace VideoDL_m3u8.DL
                                         return ms;
                                     }
 
-                                    if (segment.SegmentMap != null)
-                                    {
-                                        if (!maps.TryGetValue(segment.SegmentMap.Uri, out var map))
-                                            throw new Exception("Not found segment map.");
-                                        await fs.WriteAsync(map, 0, map.Length, _token);
-                                    }
-                                    
                                     if (segment.Key.Method != "NONE")
                                     {
                                         if (!keys.TryGetValue(segment.Key.Uri, out var key))
@@ -493,7 +440,10 @@ namespace VideoDL_m3u8.DL
                     if (!partDirName.StartsWith("Part_"))
                         continue;
                     var partFiles = Directory.GetFiles(partDir)
-                        .Where(it => it.EndsWith(".ts"));
+                        .Where(it =>
+                            it.EndsWith(".mp4") ||
+                            it.EndsWith(".m4s") ||
+                            it.EndsWith(".ts"));
                     count += partFiles.Count();
                 }
                 if (count != works.Count)
@@ -508,7 +458,7 @@ namespace VideoDL_m3u8.DL
                 stop = true;
                 timer.Enabled = false;
                 progressEvent();
-                
+
             }
             catch
             {
@@ -548,7 +498,7 @@ namespace VideoDL_m3u8.DL
                 .Select(it => new
                 {
                     Path = it,
-                    Name = Path.GetFileName(it) 
+                    Name = Path.GetFileName(it)
                 })
                 .Where(it => it.Name.StartsWith("Part_"))
                 .OrderBy(it => it.Path)
@@ -559,12 +509,18 @@ namespace VideoDL_m3u8.DL
 
             foreach (var part in parts)
             {
-                var partConcat = Path.Combine(tempDir, $"{part.Name}.ts");
+                var hasMap = File.Exists(
+                    Path.Combine(part.Path, "!MAP.mp4"));
+                var ext = hasMap ? ".mp4" : ".ts";
+                var partConcat = Path.Combine(tempDir, $"{part.Name}{ext}");
                 using (var fs = new FileStream(
                     partConcat, FileMode.Create, FileAccess.Write))
                 {
                     var partFiles = Directory.GetFiles(part.Path)
-                        .Where(it => it.EndsWith(".ts"))
+                        .Where(it =>
+                            it.EndsWith(".mp4") ||
+                            it.EndsWith(".m4s") ||
+                            it.EndsWith(".ts"))
                         .OrderBy(it => it)
                         .ToList();
 
@@ -582,16 +538,22 @@ namespace VideoDL_m3u8.DL
             var concatPath = Path.Combine(tempDir, $"concat.txt");
             var outputPath = Path.Combine(tempDir, $"output.mp4");
             var files = Directory.GetFiles(tempDir)
-                .Where(it => it.EndsWith(".ts"))
+                .Where(it =>
+                    it.EndsWith(".mp4") ||
+                    it.EndsWith(".ts"))
                 .OrderBy(it => it)
                 .ToList();
+
             var fileManifest = files
-                .Aggregate(new StringBuilder(), 
-                    (r, it)=> r.AppendLine($@"file '{it}'"))
+                .Aggregate(new StringBuilder(),
+                    (r, it) => r.AppendLine($@"file '{it}'"))
                 .ToString();
             File.WriteAllText(concatPath, fileManifest);
 
-            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc -f mp4 ""{outputPath}"" -loglevel warning";
+            var useAACFilter = files.Any(it => it.EndsWith(".ts"));
+            var txtAACFilter = useAACFilter ? "-bsf:a aac_adtstoasc" : "";
+
+            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y {txtAACFilter} -f mp4 ""{outputPath}"" -loglevel warning";
             var info = new ProcessStartInfo("ffmpeg", arguments)
             {
                 UseShellExecute = false,
@@ -617,13 +579,13 @@ namespace VideoDL_m3u8.DL
 
             var finishPath = Path.Combine(workDir, $"{saveName}.mp4");
             if (File.Exists(finishPath))
-                finishPath = Path.Combine(workDir, 
+                finishPath = Path.Combine(workDir,
                     $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.mp4");
             File.Move(outputPath, finishPath);
             File.Delete(concatPath);
             foreach (var file in files)
                 File.Delete(file);
-            
+
             if (clearTempFile)
             {
                 try

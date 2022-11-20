@@ -18,6 +18,7 @@ namespace VideoDL_m3u8.Parser
     public class Part
     {
         public List<Segment> Segments { get; set; } = new();
+        public SegmentMap? SegmentMap { get; set; }
     }
 
     public class Segment
@@ -29,7 +30,6 @@ namespace VideoDL_m3u8.Parser
         public bool Discontinuity { get; set; }
         public SegmentKey Key { get; set; } = new();
         public ByteRange? ByteRange { get; set; }
-        public SegmentMap? SegmentMap { get; set; }
     }
 
     public class SegmentKey

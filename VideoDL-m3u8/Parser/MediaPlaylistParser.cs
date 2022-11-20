@@ -45,10 +45,6 @@ namespace VideoDL_m3u8.Parser
                             segment.ByteRange = byteRange;
                             byteRange = null;
                         }
-                        if (segmentMap != null)
-                        {
-                            segment.SegmentMap = segmentMap;
-                        }
 
                         // Set key
                         segment.Key = new SegmentKey
@@ -139,6 +135,7 @@ namespace VideoDL_m3u8.Parser
                         segment.Discontinuity = true;
                         part = new Part();
                         playlist.Parts.Add(part);
+                        segmentMap = null;
                         continue;
                     }
                     match = Regex.Match(line, @"^#EXT-X-KEY:?(.*)$");
@@ -222,6 +219,7 @@ namespace VideoDL_m3u8.Parser
                                 var index16 = Convert.ToString(segment.Index, 16);
                                 segmentMap.Key.IV = $"0x{index16.PadLeft(32, '0')}";
                             }
+                            part.SegmentMap = segmentMap;
                         }
                         continue;
                     }

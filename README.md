@@ -3,20 +3,20 @@
 This is a m3u8 video downloader which can download ts files and merge to mp4 video using FFmpeg.  
 
 * Support m3u8 manifest parsing  
-* Support .ts file download  
+* Support ts or fmp4 file download  
 * Support AES-128 decryption  
 * Support custom http header  
 * Support multi-thread download  
 * Support download speed limit  
 * Support resuming from breakpoint  
-* Support FFmpeg to merge .ts files  
+* Support FFmpeg merge to mp4 video  
 * Support png header detection  
 * Support http or socks5 proxy  
-* Support video format conversion (undone)  
-* Support m3u8 byte range  
-* Support m3u8 map tag (undone)  
-* Support mpd manifest parsing (undone)  
+* Support m3u8 EXT-X-BYTERANGE  
+* Support m3u8 EXT-X-MAP  
 * Support live stream record (undone)  
+* Support video format conversion (undone)  
+* Support mpd manifest parsing (undone)  
 
 ---  
 
@@ -83,11 +83,11 @@ if (manifest.IsMaster())
 // Parse m3u8 manifest to media playlist
 var mediaPlaylist = hlsDL.ParseMediaPlaylist(manifest, m3u8Url);
 
-// Download m3u8 encryption key
+// Download m3u8 segment key
 var keys = null as Dictionary<string, string>;
-var keyUrls = hlsDL.GetKeyUrls(mediaPlaylist.Parts);
-if (keyUrls.Count > 0)
-    keys = await hlsDL.GetKeysAsync(keyUrls, header);
+var segmentKeys = hlsDL.GetKeys(mediaPlaylist.Parts);
+if (segmentKeys.Count > 0)
+    keys = await hlsDL.GetKeysDataAsync(segmentKeys, header);
 
 // Download m3u8 ts files
 await hlsDL.DownloadAsync(workDir, saveName,
@@ -166,7 +166,7 @@ public async Task DownloadAsync(
 　format: key1:key1|key2:key2  
         
 * **keys:** Dictionary\<string, string\>, optional, default: null  
-　Set m3u8 encryption key.  
+　Set m3u8 segment keys.  
 
 * **threads:** int, optional, default: 1  
 　Set the number of threads to download.  
