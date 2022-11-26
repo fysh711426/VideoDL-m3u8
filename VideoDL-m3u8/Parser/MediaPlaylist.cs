@@ -7,6 +7,7 @@ namespace VideoDL_m3u8.Parser
         public bool IsM3U { get; set; }
         public bool EndList { get; set; }
         public long MediaSequence { get; set; }
+        public int DiscontinuitySequence { get; set; }
         public int TargetDuration { get; set; }
         public double TotalDuration { get; set; }
         public int Version { get; set; }
@@ -19,6 +20,7 @@ namespace VideoDL_m3u8.Parser
     {
         public List<Segment> Segments { get; set; } = new();
         public SegmentMap? SegmentMap { get; set; }
+        public int PartIndex { get; set; }
     }
 
     public class Segment

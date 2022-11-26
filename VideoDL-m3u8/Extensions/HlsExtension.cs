@@ -8,6 +8,11 @@ namespace VideoDL_m3u8.Extensions
 {
     public static class HlsExtension
     {
+        public static bool IsLive(this MediaPlaylist mediaPlaylist)
+        {
+            return !mediaPlaylist.EndList;
+        }
+
         public static bool IsMaster(this string manifest)
         {
             return manifest.Contains("#EXT-X-STREAM-INF");

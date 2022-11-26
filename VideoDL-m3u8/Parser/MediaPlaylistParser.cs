@@ -24,6 +24,7 @@ namespace VideoDL_m3u8.Parser
                 playlist.Parts.Add(part);
 
                 var index = 0L;
+                var partIndex = 0;
 
                 while (true)
                 {
@@ -135,7 +136,20 @@ namespace VideoDL_m3u8.Parser
                         segment.Discontinuity = true;
                         part = new Part();
                         playlist.Parts.Add(part);
-                        segmentMap = null;
+                        part.PartIndex = partIndex;
+                        partIndex++;
+                        // segmentMap = null;
+                        continue;
+                    }
+                    match = Regex.Match(line, @"^#EXT-X-DISCONTINUITY-SEQUENCE:?(\-?[0-9.]*)?");
+                    if (match.Success)
+                    {
+                        var discontinuitySequence = match.Groups[1].Value;
+                        if (discontinuitySequence != "")
+                        {
+                            playlist.DiscontinuitySequence = int.Parse(discontinuitySequence);
+                            partIndex = playlist.DiscontinuitySequence;
+                        }
                         continue;
                     }
                     match = Regex.Match(line, @"^#EXT-X-KEY:?(.*)$");

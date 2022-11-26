@@ -5,6 +5,7 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 * Support m3u8 manifest parsing  
 * Support ts or fmp4 file download  
 * Support AES-128 decryption  
+* Support m3u8 byte range  
 * Support custom http header  
 * Support multi-thread download  
 * Support download speed limit  
@@ -12,9 +13,8 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 * Support FFmpeg merge to mp4 video  
 * Support png header detection  
 * Support http or socks5 proxy  
-* Support m3u8 EXT-X-BYTERANGE  
 * Support m3u8 EXT-X-MAP  
-* Support live stream record (undone)  
+* Support live stream record  
 * Support video format conversion (undone)  
 * Support mpd manifest parsing (undone)  
 
@@ -148,6 +148,8 @@ public async Task DownloadAsync(
     int maxRetry = 20,
     long? maxSpeed = null, 
     int interval = 1000,
+    bool checkComplete = false,
+    Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
     Action<ProgressEventArgs>? progress = null,
     CancellationToken token = default)
 ```
@@ -184,6 +186,12 @@ public async Task DownloadAsync(
 * **interval:** int, optional, default: 1000  
 　Set the progress callback time interval. (millisecond)  
 
+* **checkComplete:** bool, optional, default: true  
+　Set whether to check file count complete.  
+
+* **onSegment:** Func<Stream, CancellationToken, Task\<Stream\>\>, optional, default: null  
+　Set segment download callback.  
+
 * **progress:** Action\<ProgressEventArgs\>, optional, default: null  
 　Set progress callback.  
 
@@ -213,6 +221,59 @@ public async Task MergeAsync(
 
 * **onMessage:** Action\<string\>, optional, default: null  
 　Set callback function for FFmpeg warning or error messages.  
+
+* **token:** CancellationToken, optional, default: default  
+　Set cancellation token.  
+
+---  
+
+```C#
+// REC m3u8 live stream
+public async Task REC(
+    string workDir, 
+    string saveName,
+    string url, 
+    string header = "", 
+    int maxRetry = 20, 
+    long? maxSpeed = null, 
+    int interval = 1000, 
+    int? noSegStopTime = null,
+    Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
+    Action<RecProgressEventArgs>? progress = null,
+    CancellationToken token = default)
+```
+
+* **workDir:** string, required  
+　Set video download directory.  
+
+* **saveName:** string, required  
+　Set video save name.  
+
+* **url:** string, required  
+　Set m3u8 live stream url.  
+
+* **header:** string, optional, default: ""  
+　Set http request header.  
+　format: key1:key1|key2:key2  
+
+* **maxRetry:** int, optional, default: 20  
+　Set the maximum number of download retries.  
+
+* **maxSpeed:** long?, optional, default: null  
+　Set the maximum download speed. (byte)  
+　1KB = 1024 byte, 1MB = 1024 * 1024 byte  
+
+* **interval:** int, optional, default: 1000  
+　Set the progress callback time interval. (millisecond)  
+
+* **noSegStopTime:** int?, optional, default: null  
+　Set how long to stop after when there is no segment. (millisecond)  
+
+* **onSegment:** Func<Stream, CancellationToken, Task\<Stream\>\>, optional, default: null  
+　Set segment download callback.  
+
+* **progress:** Action\<RecProgressEventArgs\>, optional, default: null  
+　Set progress callback.  
 
 * **token:** CancellationToken, optional, default: default  
 　Set cancellation token.  

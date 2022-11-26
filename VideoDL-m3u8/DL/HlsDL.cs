@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -142,7 +144,7 @@ namespace VideoDL_m3u8.DL
         }
 
         /// <summary>
-        /// Get m3u8 key base64 data by segment key.
+        /// Get m3u8 key base64 data by segment keys.
         /// </summary>
         /// <param name="segmentKeys">Set m3u8 segment keys.</param>
         /// <param name="header">Set http request header.
@@ -156,12 +158,27 @@ namespace VideoDL_m3u8.DL
             var result = new Dictionary<string, string>();
             foreach (var item in segmentKeys)
             {
-                var data = await GetBytesAsync(_httpClient,
-                    item.Uri, header, null, null, token);
-                var key = Convert.ToBase64String(data);
+                var key = await GetKeyDataAsync(item, header, token);
                 result.Add(item.Uri, key);
             }
             return result;
+        }
+
+        /// <summary>
+        /// Get m3u8 key base64 data by segment key.
+        /// </summary>
+        /// <param name="segmentKey">Set m3u8 segment key.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task<string> GetKeyDataAsync(
+            SegmentKey segmentKey, string header = "",
+            CancellationToken token = default)
+        {
+            var data = await GetBytesAsync(_httpClient,
+                segmentKey.Uri, header, null, null, token);
+            return Convert.ToBase64String(data);
         }
 
         /// <summary>
@@ -179,6 +196,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="maxSpeed">Set the maximum download speed.(byte)
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
+        /// <param name="checkComplete">Set whether to check file count complete.</param>
         /// <param name="onSegment">Set segment download callback.</param>
         /// <param name="progress">Set progress callback.</param>
         /// <param name="token">Set cancellation token.</param>
@@ -189,7 +207,7 @@ namespace VideoDL_m3u8.DL
             List<Part> parts, string header = "",
             Dictionary<string, string>? keys = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
-            long? maxSpeed = null, int interval = 1000,
+            long? maxSpeed = null, int interval = 1000, bool checkComplete = true,
             Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
             Action<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
@@ -215,15 +233,13 @@ namespace VideoDL_m3u8.DL
             if (!Directory.Exists(tempDir))
                 Directory.CreateDirectory(tempDir);
 
-            var works = new List<(int index, string filePath, string ext,
+            var works = new List<(long index, string filePath, string ext,
                 (string Uri, ByteRange? ByteRange, SegmentKey Key) segment)>();
 
-            var partIndex = 0;
             foreach (var part in parts)
             {
-                var index = 0;
                 var count = part.Segments.Count;
-                var partName = $"Part_{partIndex}".PadLeft($"{parts.Count}".Length, '0');
+                var partName = $"Part_{part.PartIndex}".PadLeft($"{parts.Count}".Length, '0');
                 var partDir = Path.Combine(tempDir, partName);
                 if (!Directory.Exists(partDir))
                     Directory.CreateDirectory(partDir);
@@ -233,7 +249,9 @@ namespace VideoDL_m3u8.DL
                 {
                     var mapName = "!MAP";
                     var mapPath = Path.Combine(partDir, mapName);
-                    works.Add((index, mapPath, ".mp4",
+                    var mapIndex = part.Segments.Count == 0 ?
+                        0 : part.Segments.First().Index;
+                    works.Add((mapIndex, mapPath, ".mp4",
                         (part.SegmentMap.Uri,
                          part.SegmentMap.ByteRange,
                          part.SegmentMap.Key)));
@@ -243,13 +261,11 @@ namespace VideoDL_m3u8.DL
                 foreach (var item in part.Segments)
                 {
                     var ext = hasMap ? ".m4s" : ".ts";
-                    var fileName = $"{index}".PadLeft($"{count}".Length, '0');
+                    var fileName = $"{item.Index}".PadLeft($"{count}".Length, '0');
                     var filePath = Path.Combine(partDir, $"{fileName}");
-                    works.Add((index, filePath, ext,
+                    works.Add((item.Index, filePath, ext,
                         (item.Uri, item.ByteRange, item.Key)));
-                    index++;
                 }
-                partIndex++;
             }
 
             var retry = 0;
@@ -387,7 +403,7 @@ namespace VideoDL_m3u8.DL
                             }, rangeFrom, rangeTo, _token);
                         finish++;
                     }, threads, delay, token);
-                }, 10 * 1024, maxRetry, token);
+                }, 10 * 1000, maxRetry, token);
             }
 
             void progressEvent()
@@ -430,7 +446,7 @@ namespace VideoDL_m3u8.DL
                 }
             };
 
-            void checkComplete()
+            void checkFilesComplete()
             {
                 var count = 0;
                 var partDirs = Directory.GetDirectories(tempDir);
@@ -454,7 +470,8 @@ namespace VideoDL_m3u8.DL
             {
                 timer.Enabled = true;
                 await func();
-                checkComplete();
+                if (checkComplete)
+                    checkFilesComplete();
                 stop = true;
                 timer.Enabled = false;
                 progressEvent();
@@ -567,6 +584,9 @@ namespace VideoDL_m3u8.DL
             {
                 var warning = process.StandardError.ReadToEnd();
                 await process.WaitForExitPatchAsync(token);
+                if (process.ExitCode != 0)
+                    throw new Exception(
+                        $"FFmpeg error message. {warning}");
                 process.Dispose();
                 if (!string.IsNullOrEmpty(warning))
                     onMessage?.Invoke(warning);
@@ -593,6 +613,233 @@ namespace VideoDL_m3u8.DL
                     Directory.Delete(tempDir, true);
                 }
                 catch { }
+            }
+        }
+
+
+        /// <summary>
+        /// REC m3u8 live stream.
+        /// </summary>
+        /// <param name="workDir">Set video download directory.</param>
+        /// <param name="saveName">Set video save name.</param>
+        /// <param name="url">Set m3u8 live stream url.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="maxRetry">Set the maximum number of download retries.</param>
+        /// <param name="maxSpeed">Set the maximum download speed.(byte)
+        /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
+        /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
+        /// <param name="noSegStopTime">Set how long to stop after when there is no segment.(millisecond)</param>
+        /// <param name="onSegment">Set segment download callback.</param>
+        /// <param name="progress">Set progress callback.</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task REC(
+            string workDir, string saveName,
+            string url, string header = "", int maxRetry = 20, 
+            long? maxSpeed = null, int interval = 1000, int? noSegStopTime = null,
+            Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
+            Action<RecProgressEventArgs>? progress = null,
+            CancellationToken token = default)
+        {
+            var finishDict = new Dictionary<long, bool>();
+            var keys = new Dictionary<string, string>();
+
+            var retry = 0;
+            var now = DateTime.Now;
+            var sw = new Stopwatch();
+            
+            var finish = 0;
+            var downloadBytes = 0L;
+            var todoFinish = 0;
+            var todoDownloadBytes = 0L;
+            var speed = 0L;
+            var noSegDuration = 0;
+            var currentIndex = long.MaxValue * -1;
+            var currentPartIndex = int.MaxValue * -1;
+
+            void progressEvent()
+            {
+                try
+                {
+                    if (progress != null)
+                    {
+                        var args = new RecProgressEventArgs
+                        {
+                            Finish = finish + todoFinish,
+                            DownloadBytes = downloadBytes + todoDownloadBytes,
+                            MaxRetry = maxRetry,
+                            Retry = retry,
+                            Speed = speed,
+                            RecTime = DateTime.Now - now
+                        };
+                        progress(args);
+                    }
+                }
+                catch { }
+            }
+
+            async Task func()
+            {
+                await RetryTask.Run(async (r, ex) =>
+                {
+                    todoFinish = 0;
+                    todoDownloadBytes = 0;
+                    retry = r;
+
+                    while (true)
+                    {
+                        sw.Restart();
+
+                        // Download and parse m3u8 manifest
+                        var mediaPlaylist = await GetMediaPlaylistAsync(url, header, token);
+
+                        // Download m3u8 segment key
+                        var segmentKeys = GetKeys(mediaPlaylist.Parts);
+                        foreach (var segmentKey in segmentKeys)
+                        {
+                            if (!keys.ContainsKey(segmentKey.Uri))
+                            {
+                                var key = await GetKeyDataAsync(segmentKey, header, token);
+                                keys.Add(segmentKey.Uri, key);
+                            }
+                        }
+
+                        // Get todo part list
+                        var todoParts = mediaPlaylist.Parts
+                            .Select(it =>
+                            {
+                                var segs = it.Segments
+                                    .Where(itt => !finishDict.ContainsKey(itt.Index))
+                                    .ToList();
+                                it.Segments = segs;
+                                return it;
+                            })
+                            .Where(it => it.Segments.Count > 0)
+                            .ToList();
+
+                        // Check playlist reset
+                        bool isReset()
+                        {
+                            foreach (var part in todoParts)
+                            {
+                                if (part.PartIndex < currentPartIndex)
+                                    return true;
+                                if (part.PartIndex == currentPartIndex)
+                                {
+                                    foreach (var seg in part.Segments)
+                                    {
+                                        if (seg.Index < currentIndex)
+                                            return true;
+                                    }
+                                }
+                            }
+                            return false;
+                        }
+                        if (isReset())
+                            break;
+
+                        var hasSeg = false;
+                        if (todoParts.Count > 0)
+                        {
+                            hasSeg = true;
+                            noSegDuration = 0;
+
+                            // Download m3u8 ts files
+                            await DownloadAsync(workDir,
+                                saveName, todoParts, header, keys,
+                                threads: 1, delay: 1, maxRetry: 0,
+                                maxSpeed: maxSpeed, checkComplete: false,
+                                interval: interval, onSegment: onSegment,
+                                progress: (args) =>
+                                {
+                                    speed = args.Speed;
+                                    todoFinish = args.Finish;
+                                    todoDownloadBytes = args.DownloadBytes;
+                                },
+                                token: token);
+                            sw.Stop();
+
+                            // Update parameters
+                            finish += todoFinish;
+                            downloadBytes += todoDownloadBytes;
+                            todoFinish = 0;
+                            todoDownloadBytes = 0;
+                            todoParts
+                                .SelectMany(it => it.Segments)
+                                .ToList()
+                                .ForEach(it =>
+                                {
+                                    if (!finishDict.ContainsKey(it.Index))
+                                        finishDict.Add(it.Index, true);
+                                });
+                        }
+
+                        // Live ends
+                        if (mediaPlaylist.EndList)
+                            break;
+
+                        if (noSegStopTime != null)
+                        {
+                            if (noSegDuration >= noSegStopTime.Value)
+                                break;
+                        }
+
+                        // Waiting for new segment
+                        var targetDurationTime = 
+                            mediaPlaylist.TargetDuration * 1000;
+
+                        if (!hasSeg)
+                        {
+                            var half = targetDurationTime / 2;
+                            noSegDuration += half;
+                            var timespan = half - sw.ElapsedMilliseconds;
+                            if (timespan > 0)
+                            {
+                                await Task.Delay(half, token);
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            var timespan = targetDurationTime - sw.ElapsedMilliseconds;
+                            if (timespan > 0)
+                            {
+                                await Task.Delay((int)timespan, token);
+                                continue;
+                            }
+                        }
+                        await Task.Delay(1);
+                    }
+                }, 1, maxRetry, token);
+            }
+
+            var stop = false;
+            var timer = new System.Timers.Timer(interval);
+            timer.AutoReset = true;
+            timer.Elapsed += delegate
+            {
+                if (!stop)
+                {
+                    progressEvent();
+                }
+            };
+
+            try
+            {
+                timer.Enabled = true;
+                await func();
+                stop = true;
+                timer.Enabled = false;
+                progressEvent();
+
+            }
+            catch
+            {
+                stop = true;
+                timer.Enabled = false;
+                progressEvent();
+                throw;
             }
         }
     }
