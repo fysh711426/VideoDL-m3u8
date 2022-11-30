@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -498,6 +496,7 @@ namespace VideoDL_m3u8.DL
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
             bool clearTempFile = true, Action<string>? onMessage = null,
+            bool genpts = false, bool igndts = false,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(workDir))
@@ -528,31 +527,60 @@ namespace VideoDL_m3u8.DL
             {
                 var hasMap = File.Exists(
                     Path.Combine(part.Path, "!MAP.mp4"));
-                var ext = hasMap ? ".mp4" : ".ts";
-                var partConcat = Path.Combine(tempDir, $"{part.Name}{ext}");
-                using (var fs = new FileStream(
-                    partConcat, FileMode.Create, FileAccess.Write))
-                {
-                    var partFiles = Directory.GetFiles(part.Path)
-                        .Where(it =>
-                            it.EndsWith(".mp4") ||
-                            it.EndsWith(".m4s") ||
-                            it.EndsWith(".ts"))
-                        .OrderBy(it => it)
-                        .ToList();
-
-                    foreach (var partFile in partFiles)
+                // var ext = hasMap ? ".mp4" : ".ts";
+                var ext = ".mp4";
+                var partConcatPath = Path.Combine(tempDir, $"{part.Name}{ext}");
+                var partFiles = Directory.GetFiles(part.Path)
+                    .Where(it =>
+                        it.EndsWith(".mp4") ||
+                        it.EndsWith(".m4s") ||
+                        it.EndsWith(".ts"));
+                var partFileOrderList = partFiles
+                    .Select(it => new
                     {
-                        using (var tempFs = new FileStream(
-                            partFile, FileMode.Open, FileAccess.Read))
+                        index = Path.GetFileNameWithoutExtension(it)
+                                .PadLeft(19 + 4, '_'),
+                        item = it
+                    })
+                    .OrderBy(it => it.index)
+                    .Select(it => it.item)
+                    .ToList();
+                var binaryMerge = hasMap ? true : false;
+                if (binaryMerge)
+                {
+                    using (var fs = new FileStream(
+                        partConcatPath, FileMode.Create, FileAccess.Write))
+                    {
+                        foreach (var partFile in partFileOrderList)
                         {
-                            await tempFs.CopyToAsync(fs, 4096, token);
+                            using (var tempFs = new FileStream(
+                                partFile, FileMode.Open, FileAccess.Read))
+                            {
+                                await tempFs.CopyToAsync(fs, 4096, token);
+                            }
                         }
                     }
                 }
+                else
+                {
+                    var partConcatTextPath = Path.Combine(part.Path, $"concat.txt");
+                    var partFileManifest = partFileOrderList
+                        .Aggregate(new StringBuilder(),
+                            (r, it) => r.AppendLine($@"file '{it}'"))
+                        .ToString();
+                    File.WriteAllText(partConcatTextPath, partFileManifest);
+
+                    var _useAACFilter = partFiles.Any(it => it.EndsWith(".ts"));
+                    var _tAACFilter = _useAACFilter ? "-bsf:a aac_adtstoasc" : "";
+                    var _tFFlags = genpts || igndts ? $"-fflags {(genpts ? "+genpts" : "")}{(genpts ? "+igndts" : "")}" : "";
+                    var _arguments = $@"{_tFFlags} -f concat -safe 0 -i ""{partConcatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -f mp4 {_tAACFilter} ""{partConcatPath}"" -loglevel warning";
+                    await FFmpeg.ExecuteAsync(_arguments, onMessage, token);
+                    
+                    File.Delete(partConcatTextPath);
+                }
             }
 
-            var concatPath = Path.Combine(tempDir, $"concat.txt");
+            var concatTextPath = Path.Combine(tempDir, $"concat.txt");
             var outputPath = Path.Combine(tempDir, $"output.mp4");
             var files = Directory.GetFiles(tempDir)
                 .Where(it =>
@@ -561,48 +589,33 @@ namespace VideoDL_m3u8.DL
                 .OrderBy(it => it)
                 .ToList();
 
-            var fileManifest = files
-                .Aggregate(new StringBuilder(),
-                    (r, it) => r.AppendLine($@"file '{it}'"))
-                .ToString();
-            File.WriteAllText(concatPath, fileManifest);
-
-            var useAACFilter = files.Any(it => it.EndsWith(".ts"));
-            var txtAACFilter = useAACFilter ? "-bsf:a aac_adtstoasc" : "";
-
-            var arguments = $@"-f concat -safe 0 -i ""{concatPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y {txtAACFilter} -f mp4 ""{outputPath}"" -loglevel warning";
-            var info = new ProcessStartInfo("ffmpeg", arguments)
+            if (files.Count == 1)
             {
-                UseShellExecute = false,
-                RedirectStandardError = true
-            };
-            var process = Process.Start(info);
-            if (process == null)
-                throw new Exception("Process start error.");
-
-            try
-            {
-                var warning = process.StandardError.ReadToEnd();
-                await process.WaitForExitPatchAsync(token);
-                if (process.ExitCode != 0)
-                    throw new Exception(
-                        $"FFmpeg error message. {warning}");
-                process.Dispose();
-                if (!string.IsNullOrEmpty(warning))
-                    onMessage?.Invoke(warning);
+                File.Move(files.First(), outputPath);
             }
-            catch
+            if (files.Count > 1)
             {
-                process.Dispose();
-                throw;
-            }
+                var fileManifest = files
+                    .Aggregate(new StringBuilder(),
+                        (r, it) => r.AppendLine($@"file '{it}'"))
+                    .ToString();
+                File.WriteAllText(concatTextPath, fileManifest);
 
+                var useAACFilter = files.Any(it => it.EndsWith(".ts"));
+                var tAACFilter = useAACFilter ? "-bsf:a aac_adtstoasc" : "";
+                var tFFlags = genpts || igndts ? $"-fflags {(genpts ? "+genpts" : "")}{(genpts ? "+igndts" : "")}" : "";
+
+                var arguments = $@"{tFFlags} -f concat -safe 0 -i ""{concatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y {tAACFilter} ""{outputPath}"" -loglevel warning";
+                await FFmpeg.ExecuteAsync(arguments, onMessage, token);
+
+                File.Delete(concatTextPath);
+            }
+            
             var finishPath = Path.Combine(workDir, $"{saveName}.mp4");
             if (File.Exists(finishPath))
                 finishPath = Path.Combine(workDir,
                     $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.mp4");
             File.Move(outputPath, finishPath);
-            File.Delete(concatPath);
             foreach (var file in files)
                 File.Delete(file);
 
