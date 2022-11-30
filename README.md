@@ -133,6 +133,38 @@ var hlsDL = new HlsDL(
 
 ---  
 
+### REC Example  
+
+```C#
+// Is a live stream
+if (mediaPlaylist.IsLive())
+{
+    var cts = new CancellationTokenSource();
+    // Check REC stop
+    CheckStop(cts);
+
+    try
+    {
+        await hlsDL.REC(workDir, saveName,
+            url, header, maxSpeed: 5 * 1024 * 1024,
+            onSegment: async (ms, token) =>
+            {
+                return await ms.TrySkipPngHeaderAsync(token);
+            },
+            progress: (args) =>
+            {
+                var print = args.Format;
+                var sub = Console.WindowWidth - 2 - print.Length;
+                Console.Write("\r" + print + new string(' ', sub) + "\r");
+            },
+            token: cts.Token);
+    }
+    catch { }
+}
+```
+
+---  
+
 ### Documentation  
 
 ```C#

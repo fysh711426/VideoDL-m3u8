@@ -18,6 +18,19 @@ namespace VideoDL_m3u8.DL
     {
         protected readonly HttpClient _httpClient;
 
+        private static HttpClient CreateHttpClient(int timeout, string? proxy)
+        {
+            HttpClientHandler GetHandler()
+            {
+                if (proxy == null)
+                    return Http.ClientHandler;
+                return Http.GetClientHandler(proxy);
+            }
+            var httpClient = new HttpClient(GetHandler(), false);
+            httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
+            return httpClient;
+        }
+
         /// <summary>
         /// Init HlsDL.
         /// </summary>
@@ -25,26 +38,17 @@ namespace VideoDL_m3u8.DL
         /// <param name="proxy">Set http or socks5 proxy.
         /// http://{hostname}:{port} or socks5://{hostname}:{port}</param>
         public HlsDL(int timeout = 60000, string? proxy = null)
-            : this(CreateHttpClient(proxy), timeout)
+            : this(CreateHttpClient(timeout, proxy))
         {
-        }
-
-        private static HttpClient CreateHttpClient(string? proxy)
-        {
-            if (proxy == null)
-                return Http.Client;
-            return Http.GetClient(proxy);
         }
 
         /// <summary>
         /// Init HlsDL.
         /// </summary>
         /// <param name="httpClient">Set http client.</param>
-        /// <param name="timeout">Set http request timeout.(millisecond)</param>
-        public HlsDL(HttpClient httpClient, int timeout = 60000)
+        public HlsDL(HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
         }
 
         /// <summary>
@@ -496,7 +500,6 @@ namespace VideoDL_m3u8.DL
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
             bool clearTempFile = true, Action<string>? onMessage = null,
-            bool genpts = false, bool igndts = false,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(workDir))
@@ -572,8 +575,7 @@ namespace VideoDL_m3u8.DL
 
                     var _useAACFilter = partFiles.Any(it => it.EndsWith(".ts"));
                     var _tAACFilter = _useAACFilter ? "-bsf:a aac_adtstoasc" : "";
-                    var _tFFlags = genpts || igndts ? $"-fflags {(genpts ? "+genpts" : "")}{(genpts ? "+igndts" : "")}" : "";
-                    var _arguments = $@"{_tFFlags} -f concat -safe 0 -i ""{partConcatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -f mp4 {_tAACFilter} ""{partConcatPath}"" -loglevel warning";
+                    var _arguments = $@"-f concat -safe 0 -i ""{partConcatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -f mp4 {_tAACFilter} ""{partConcatPath}"" -loglevel warning";
                     await FFmpeg.ExecuteAsync(_arguments, onMessage, token);
                     
                     File.Delete(partConcatTextPath);
@@ -603,9 +605,7 @@ namespace VideoDL_m3u8.DL
 
                 var useAACFilter = files.Any(it => it.EndsWith(".ts"));
                 var tAACFilter = useAACFilter ? "-bsf:a aac_adtstoasc" : "";
-                var tFFlags = genpts || igndts ? $"-fflags {(genpts ? "+genpts" : "")}{(genpts ? "+igndts" : "")}" : "";
-
-                var arguments = $@"{tFFlags} -f concat -safe 0 -i ""{concatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y {tAACFilter} ""{outputPath}"" -loglevel warning";
+                var arguments = $@"-f concat -safe 0 -i ""{concatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y {tAACFilter} ""{outputPath}"" -loglevel warning";
                 await FFmpeg.ExecuteAsync(arguments, onMessage, token);
 
                 File.Delete(concatTextPath);
@@ -670,6 +670,8 @@ namespace VideoDL_m3u8.DL
             var noSegDuration = 0;
             var currentIndex = long.MaxValue * -1;
             var currentPartIndex = int.MaxValue * -1;
+            var startIndex = 0L as long?;
+            var lost = 0;
 
             void progressEvent()
             {
@@ -684,6 +686,7 @@ namespace VideoDL_m3u8.DL
                             MaxRetry = maxRetry,
                             Retry = retry,
                             Speed = speed,
+                            Lost= lost,
                             RecTime = DateTime.Now - now
                         };
                         progress(args);
@@ -744,8 +747,10 @@ namespace VideoDL_m3u8.DL
                                     {
                                         if (seg.Index < currentIndex)
                                             return true;
+                                        currentIndex = seg.Index;
                                     }
                                 }
+                                currentPartIndex = part.PartIndex;
                             }
                             return false;
                         }
@@ -786,6 +791,17 @@ namespace VideoDL_m3u8.DL
                                     if (!finishDict.ContainsKey(it.Index))
                                         finishDict.Add(it.Index, true);
                                 });
+                        }
+
+                        if (startIndex == null)
+                        {
+                            startIndex = todoParts
+                                .FirstOrDefault()?.Segments
+                                .FirstOrDefault()?.Index;
+                        }
+                        if (startIndex != null)
+                        {
+                            lost = (int)(currentIndex - startIndex.Value - finishDict.Count + 1);
                         }
 
                         // Live ends

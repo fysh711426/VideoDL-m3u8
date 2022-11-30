@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8.DL;
 using VideoDL_m3u8.Extensions;
@@ -69,7 +70,8 @@ namespace Example
             Console.WriteLine("\nStart Merge...");
 
             // Merge m3u8 ts files by FFmpeg
-            await hlsDL.MergeAsync(workDir, saveName, true,
+            await hlsDL.MergeAsync(workDir, saveName, 
+                clearTempFile: true,
                 onMessage: (msg) =>
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -78,6 +80,81 @@ namespace Example
                 });
             Console.WriteLine("Finish.");
             Console.ReadLine();
+        }
+
+        public static async Task REC(string[] args)
+        {
+            // m3u8 url
+            var url = "";
+            // http request header
+            var header = "";
+            // video save directory
+            var workDir = @"D:\Temp";
+            // video save name
+            var saveName = "Live";
+
+            Console.WriteLine("Start REC...");
+
+            var hlsDL = new HlsDL();
+
+            // Download m3u8 manifest to media playlist
+            var mediaPlaylist = await hlsDL.GetMediaPlaylistAsync(url, header);
+
+            // Is a live stream
+            if (mediaPlaylist.IsLive())
+            {
+                var cts = new CancellationTokenSource();
+                // Check REC stop
+                CheckStop(cts);
+
+                try
+                {
+                    await hlsDL.REC(workDir, saveName,
+                        url, header, maxSpeed: 5 * 1024 * 1024,
+                        onSegment: async (ms, token) =>
+                        {
+                            return await ms.TrySkipPngHeaderAsync(token);
+                        },
+                        progress: (args) =>
+                        {
+                            var print = args.Format;
+                            var sub = Console.WindowWidth - 2 - print.Length;
+                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                        },
+                        token: cts.Token);
+                }
+                catch { }
+
+                Console.WriteLine("\nStart Merge...");
+
+                // Merge m3u8 ts files by FFmpeg
+                await hlsDL.MergeAsync(workDir, saveName,
+                    clearTempFile: false,
+                    onMessage: (msg) =>
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write(msg);
+                        Console.ResetColor();
+                    });
+                Console.WriteLine("Finish.");
+                Console.ReadLine();
+            }
+        }
+
+        private static void CheckStop(CancellationTokenSource cts)
+        {
+            var task = Task.Run(() =>
+            {
+                while (true)
+                {
+                    var input = Console.ReadLine();
+                    if (input == "q")
+                    {
+                        cts.Cancel();
+                        break;
+                    }
+                }
+            });
         }
     }
 }

@@ -9,7 +9,7 @@ namespace VideoDL_m3u8.Utils
 {
     internal static class Http
     {
-        private static readonly Lazy<HttpClient> HttpClientLazy = new(() =>
+        private static readonly Lazy<HttpClientHandler> HttpClientHandlerLazy = new(() =>
         {
             var handler = new HttpClientHandler
             {
@@ -22,20 +22,20 @@ namespace VideoDL_m3u8.Utils
                 DecompressionMethods.GZip | 
                 DecompressionMethods.Deflate;
 
-            return new HttpClient(handler, true);
+            return handler;
         });
 
-        public static HttpClient Client => HttpClientLazy.Value;
+        public static HttpClientHandler ClientHandler => HttpClientHandlerLazy.Value;
 
-        private static readonly Dictionary<string, Lazy<HttpClient>>
-            HttpClientLazyDict = new();
+        private static readonly Dictionary<string, Lazy<HttpClientHandler>>
+            HttpClientHandlerLazyDict = new();
 
-        public static HttpClient GetClient(string proxy)
+        public static HttpClientHandler GetClientHandler(string proxy)
         {
-            if (HttpClientLazyDict.TryGetValue(proxy, out var client))
+            if (HttpClientHandlerLazyDict.TryGetValue(proxy, out var client))
                 return client.Value;
 
-            HttpClientLazyDict.Add(proxy, new (() =>
+            HttpClientHandlerLazyDict.Add(proxy, new (() =>
             {
                 var webProxy = null as IWebProxy;
 
@@ -76,9 +76,9 @@ namespace VideoDL_m3u8.Utils
                     DecompressionMethods.GZip |
                     DecompressionMethods.Deflate;
 
-                return new HttpClient(handler, true);
+                return handler;
             }));
-            return HttpClientLazyDict[proxy].Value;
+            return HttpClientHandlerLazyDict[proxy].Value;
         }
     }
 }
