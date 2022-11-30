@@ -670,7 +670,7 @@ namespace VideoDL_m3u8.DL
             var noSegDuration = 0;
             var currentIndex = long.MaxValue * -1;
             var currentPartIndex = int.MaxValue * -1;
-            var startIndex = 0L as long?;
+            var startIndex = null as long?;
             var lost = 0;
 
             void progressEvent()
@@ -747,10 +747,8 @@ namespace VideoDL_m3u8.DL
                                     {
                                         if (seg.Index < currentIndex)
                                             return true;
-                                        currentIndex = seg.Index;
                                     }
                                 }
-                                currentPartIndex = part.PartIndex;
                             }
                             return false;
                         }
@@ -791,8 +789,14 @@ namespace VideoDL_m3u8.DL
                                     if (!finishDict.ContainsKey(it.Index))
                                         finishDict.Add(it.Index, true);
                                 });
+
+                            // Update index
+                            var lastPart = todoParts.Last();
+                            currentPartIndex = lastPart.PartIndex;
+                            currentIndex = lastPart.Segments.Last().Index;
                         }
 
+                        // Check lost
                         if (startIndex == null)
                         {
                             startIndex = todoParts
