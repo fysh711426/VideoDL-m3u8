@@ -15,7 +15,7 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 * Support http or socks5 proxy  
 * Support m3u8 EXT-X-MAP  
 * Support live stream record  
-* Support video format conversion (undone)  
+* Support output format conversion  
 * Support mpd manifest parsing (undone)  
 
 ---  
@@ -237,6 +237,8 @@ public async Task DownloadAsync(
 public async Task MergeAsync(
     string workDir, 
     string saveName,
+    OutputFormat outputFormat = OutputFormat.MP4,
+    bool binaryMerge = false,
     bool clearTempFile = true, 
     Action<string>? onMessage = null,
     CancellationToken token = default)
@@ -247,6 +249,12 @@ public async Task MergeAsync(
 
 * **saveName:** string, required  
 　Set video save name.  
+
+* **outputFormat:** OutputFormat, optional, default: MP4  
+　Set video output format.  
+
+* **binaryMerge:** bool, optional, default: false  
+　Set use binary merge.  
 
 * **clearTempFile:** bool, optional, default: true  
 　Set whether to clear the temporary file after the merge is completed.  

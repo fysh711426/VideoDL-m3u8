@@ -136,8 +136,8 @@ namespace VideoDL_m3u8.Parser
                         segment.Discontinuity = true;
                         part = new Part();
                         playlist.Parts.Add(part);
-                        part.PartIndex = partIndex;
                         partIndex++;
+                        part.PartIndex = partIndex;
                         // segmentMap = null;
                         continue;
                     }

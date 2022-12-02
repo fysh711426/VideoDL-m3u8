@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using VideoDL_m3u8.Enums;
 using VideoDL_m3u8.Events;
 using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
@@ -493,12 +494,15 @@ namespace VideoDL_m3u8.DL
         /// </summary>
         /// <param name="workDir">Set video download directory.</param>
         /// <param name="saveName">Set video save name.</param>
+        /// <param name="outputFormat">Set video output format.</param>
+        /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
         /// <param name="onMessage">Set callback function for FFmpeg warning or error messages.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
+            OutputFormat outputFormat = OutputFormat.MP4, bool binaryMerge = false, 
             bool clearTempFile = true, Action<string>? onMessage = null,
             CancellationToken token = default)
         {
@@ -530,31 +534,38 @@ namespace VideoDL_m3u8.DL
             {
                 var hasMap = File.Exists(
                     Path.Combine(part.Path, "!MAP.mp4"));
-                // var ext = hasMap ? ".mp4" : ".ts";
-                var ext = ".mp4";
-                var partConcatPath = Path.Combine(tempDir, $"{part.Name}{ext}");
+
                 var partFiles = Directory.GetFiles(part.Path)
                     .Where(it =>
                         it.EndsWith(".mp4") ||
                         it.EndsWith(".m4s") ||
-                        it.EndsWith(".ts"));
-                var partFileOrderList = partFiles
+                        it.EndsWith(".ts"))
                     .Select(it => new
                     {
+                        item = it,
                         index = Path.GetFileNameWithoutExtension(it)
-                                .PadLeft(19 + 4, '_'),
-                        item = it
+                            .PadLeft(19 + 4, '_')
                     })
                     .OrderBy(it => it.index)
                     .Select(it => it.item)
                     .ToList();
-                var binaryMerge = hasMap ? true : false;
-                if (binaryMerge)
+
+                var partOutputPath = Path.Combine(tempDir, $"{part.Name}");
+
+                var format = hasMap ? "fmp4" : "ts";
+
+                var _binaryMerge = binaryMerge;
+                if (format == "fmp4" || parts.Count > 1 || partFiles.Count > 1800)
+                    _binaryMerge = true;
+
+                if (_binaryMerge)
                 {
+                    var ext = format == "fmp4" ? ".mp4" : ".ts";
+
                     using (var fs = new FileStream(
-                        partConcatPath, FileMode.Create, FileAccess.Write))
+                        $"{partOutputPath}{ext}", FileMode.Create, FileAccess.Write))
                     {
-                        foreach (var partFile in partFileOrderList)
+                        foreach (var partFile in partFiles)
                         {
                             using (var tempFs = new FileStream(
                                 partFile, FileMode.Open, FileAccess.Read))
@@ -566,69 +577,134 @@ namespace VideoDL_m3u8.DL
                 }
                 else
                 {
-                    var partConcatTextPath = Path.Combine(part.Path, $"concat.txt");
-                    var partFileManifest = partFileOrderList
-                        .Aggregate(new StringBuilder(),
-                            (r, it) => r.AppendLine($@"file '{it}'"))
-                        .ToString();
-                    File.WriteAllText(partConcatTextPath, partFileManifest);
+                    var concatText = string.Join("|",
+                        partFiles.Select(it => Path.GetFileName(it)));
 
-                    var _useAACFilter = partFiles.Any(it => it.EndsWith(".ts"));
-                    var _tAACFilter = _useAACFilter ? "-bsf:a aac_adtstoasc" : "";
-                    var _arguments = $@"-f concat -safe 0 -i ""{partConcatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y -f mp4 {_tAACFilter} ""{partConcatPath}"" -loglevel warning";
-                    await FFmpeg.ExecuteAsync(_arguments, onMessage, token);
+                    var arguments = "";
+                    arguments += $@"-loglevel warning -i concat:""{concatText}"" ";
                     
-                    File.Delete(partConcatTextPath);
+                    switch (outputFormat)
+                    {
+                        case OutputFormat.MP4:
+                            arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc {partOutputPath}.mp4";
+                            break;
+                        case OutputFormat.TS:
+                            arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb {partOutputPath}.ts";
+                            break;
+                        case OutputFormat.AAC:
+                            arguments += $@"-map 0:a -c copy -y {partOutputPath}.aac";
+                            break;
+                        case OutputFormat.SRT:
+                            arguments += $@"-map 0 -y {partOutputPath}.srt";
+                            break;
+                        default:
+                            throw new Exception("OutputFormat not match.");
+                    }
+                    var workingDir = Path.GetDirectoryName(partFiles.First());
+                    await FFmpeg.ExecuteAsync(arguments, workingDir, onMessage, token);
                 }
             }
 
-            var concatTextPath = Path.Combine(tempDir, $"concat.txt");
-            var outputPath = Path.Combine(tempDir, $"output.mp4");
             var files = Directory.GetFiles(tempDir)
                 .Where(it =>
                     it.EndsWith(".mp4") ||
-                    it.EndsWith(".ts"))
+                    it.EndsWith(".ts") ||
+                    it.EndsWith(".aac") ||
+                    it.EndsWith(".srt"))
                 .OrderBy(it => it)
                 .ToList();
 
+            void clear()
+            {
+                if (clearTempFile)
+                {
+                    try
+                    {
+                        Directory.Delete(tempDir, true);
+                    }
+                    catch { }
+                }
+            }
+
+            string getFormatExt()
+            {
+                if (outputFormat == OutputFormat.MP4)
+                    return ".mp4";
+                if (outputFormat == OutputFormat.TS)
+                    return ".ts";
+                if (outputFormat == OutputFormat.AAC)
+                    return ".aac";
+                if (outputFormat == OutputFormat.SRT)
+                    return ".srt";
+                return "";
+            }
+
             if (files.Count == 1)
             {
-                File.Move(files.First(), outputPath);
-            }
-            if (files.Count > 1)
-            {
-                var fileManifest = files
-                    .Aggregate(new StringBuilder(),
-                        (r, it) => r.AppendLine($@"file '{it}'"))
-                    .ToString();
-                File.WriteAllText(concatTextPath, fileManifest);
-
-                var useAACFilter = files.Any(it => it.EndsWith(".ts"));
-                var tAACFilter = useAACFilter ? "-bsf:a aac_adtstoasc" : "";
-                var arguments = $@"-f concat -safe 0 -i ""{concatTextPath}"" -map 0:v? -map 0:a? -map 0:s? -c copy -y {tAACFilter} ""{outputPath}"" -loglevel warning";
-                await FFmpeg.ExecuteAsync(arguments, onMessage, token);
-
-                File.Delete(concatTextPath);
-            }
-            
-            var finishPath = Path.Combine(workDir, $"{saveName}.mp4");
-            if (File.Exists(finishPath))
-                finishPath = Path.Combine(workDir,
-                    $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.mp4");
-            File.Move(outputPath, finishPath);
-            foreach (var file in files)
-                File.Delete(file);
-
-            if (clearTempFile)
-            {
-                try
+                var file = files.First();
+                var ext = Path.GetExtension(file);
+                if (ext == getFormatExt())
                 {
-                    Directory.Delete(tempDir, true);
+                    var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
+                    if (File.Exists(finishPath))
+                        finishPath = Path.Combine(workDir,
+                            $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}{ext}");
+                    File.Move(file, finishPath);
+                    clear();
+                    return;
                 }
-                catch { }
+            }
+
+            // Multiple or format
+            {
+                var outputPath = Path.Combine(tempDir, $"output");
+                var concatTextPath = Path.Combine(tempDir, $"concat.txt");
+                var manifest = files
+                    .Aggregate(new StringBuilder(),
+                        (r, it) => r.AppendLine($@"file '{it}'")).ToString();
+                File.WriteAllText(concatTextPath, manifest);
+
+                var arguments = "";
+                arguments += $@"-loglevel warning -f concat -safe 0 -i ""{concatTextPath}"" ";
+
+                switch (outputFormat)
+                {
+                    case OutputFormat.MP4:
+                        var aacFilter = files.Any(it => it.EndsWith(".ts")) ? "-bsf:a aac_adtstoasc" : "";
+                        arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y {aacFilter} {outputPath}.mp4";
+                        break;
+                    case OutputFormat.TS:
+                        arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb {outputPath}.ts";
+                        break;
+                    case OutputFormat.AAC:
+                        arguments += $@"-map 0:a -c copy -y {outputPath}.aac";
+                        break;
+                    case OutputFormat.SRT:
+                        arguments += $@"-map 0 -y {outputPath}.srt";
+                        break;
+                    default:
+                        throw new Exception("OutputFormat not match.");
+                }
+
+                await FFmpeg.ExecuteAsync(arguments, null, onMessage, token);
+                File.Delete(concatTextPath);
+
+                var output = Directory.GetFiles(tempDir)
+                    .Where(it => Path.GetFileName(it).StartsWith("output"))
+                    .First();
+
+                var ext = Path.GetExtension(output);
+                var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
+                if (File.Exists(finishPath))
+                    finishPath = Path.Combine(workDir,
+                        $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}{ext}");
+                File.Move(output, finishPath);
+
+                foreach (var file in files)
+                    File.Delete(file);
+                clear();
             }
         }
-
 
         /// <summary>
         /// REC m3u8 live stream.
