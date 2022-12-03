@@ -200,8 +200,8 @@ var audioMediaGroup = masterPlaylist.MediaGroups
     .FirstOrDefault();
 if (audioMediaGroup == null)
     throw new Exception("Not found audio media.");
-    var audioPlaylist = await hlsDL.GetMediaPlaylistAsync(
-        audioMediaGroup.Uri, header);
+var audioPlaylist = await hlsDL.GetMediaPlaylistAsync(
+    audioMediaGroup.Uri, header);
 
 // Download and merge video and audio
 await downloadMerge("video", videoSaveName, videoPlaylist);
