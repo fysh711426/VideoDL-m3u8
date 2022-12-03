@@ -4,7 +4,7 @@
     {
         MP4,
         TS,
-        AAC,
+        M4A,
         SRT
     }
 }

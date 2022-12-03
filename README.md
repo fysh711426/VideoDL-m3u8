@@ -13,9 +13,10 @@ This is a m3u8 video downloader which can download ts files and merge to mp4 vid
 * Support FFmpeg merge to mp4 video  
 * Support png header detection  
 * Support http or socks5 proxy  
-* Support m3u8 EXT-X-MAP  
 * Support live stream record  
 * Support output format conversion  
+* Support m3u8 EXT-X-MEDIA  
+* Support muxing video and audio  
 * Support mpd manifest parsing (undone)  
 
 ---  
@@ -145,12 +146,8 @@ if (mediaPlaylist.IsLive())
 
     try
     {
-        await hlsDL.REC(workDir, saveName,
-            url, header, maxSpeed: 5 * 1024 * 1024,
-            onSegment: async (ms, token) =>
-            {
-                return await ms.TrySkipPngHeaderAsync(token);
-            },
+        await hlsDL.REC(
+            workDir, saveName, url, header,
             progress: (args) =>
             {
                 var print = args.Format;
@@ -256,7 +253,7 @@ public async Task MergeAsync(
 * **binaryMerge:** bool, optional, default: false  
 　Set use binary merge.  
 
-* **clearTempFile:** bool, optional, default: true  
+* **clearTempFile:** bool, optional, default: false  
 　Set whether to clear the temporary file after the merge is completed.  
 
 * **onMessage:** Action\<string\>, optional, default: null  
@@ -314,6 +311,45 @@ public async Task REC(
 
 * **progress:** Action\<RecProgressEventArgs\>, optional, default: null  
 　Set progress callback.  
+
+* **token:** CancellationToken, optional, default: default  
+　Set cancellation token.  
+
+---  
+
+```C#
+// Muxing video source and audio source
+public async Task MuxingAsync(
+    string workDir, 
+    string saveName,
+    string videoSourcePath, 
+    string audioSourcePath,
+    MuxOutputFormat outputFormat = MuxOutputFormat.MP4,
+    bool clearSource = false, 
+    Action<string>? onMessage = null,
+    CancellationToken token = default)
+```
+
+* **workDir:** string, required  
+　Set video save directory.  
+
+* **saveName:** string, required  
+　Set video save name.  
+
+* **videoSourcePath:** string, required  
+　Set video source path.  
+
+* **audioSourcePath:** string, required  
+　Set audio source path.  
+
+* **outputFormat:** MuxOutputFormat, optional, default: MP4  
+　Set video output format.  
+
+* **clearSource:** bool, optional, default: false  
+　Set whether to clear source file after the muxing is completed.  
+
+* **onMessage:** Action\<string\>, optional, default: null  
+　Set callback function for FFmpeg warning or error messages.  
 
 * **token:** CancellationToken, optional, default: default  
 　Set cancellation token.  

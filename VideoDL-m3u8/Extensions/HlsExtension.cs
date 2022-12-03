@@ -36,11 +36,11 @@ namespace VideoDL_m3u8.Extensions
 
         public static string CombineUri(this string m3u8Url, string uri)
         {
-            if (uri.Contains("http"))
+            if (uri.StartsWith("http"))
                 return uri;
             m3u8Url = Regex.Match(m3u8Url, @"(.*?\/)+").Value;
-            // m3u8Url = m3u8Url.TrimEnd('/');
-            return new Uri(new Uri(m3u8Url), uri).ToString();
+            return 
+                new Uri(new Uri(m3u8Url), uri).ToString();
         }
     }
 }

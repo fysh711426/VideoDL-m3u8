@@ -503,7 +503,7 @@ namespace VideoDL_m3u8.DL
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
             OutputFormat outputFormat = OutputFormat.MP4, bool binaryMerge = false, 
-            bool clearTempFile = true, Action<string>? onMessage = null,
+            bool clearTempFile = false, Action<string>? onMessage = null,
             CancellationToken token = default)
         {
             if (string.IsNullOrWhiteSpace(workDir))
@@ -591,8 +591,8 @@ namespace VideoDL_m3u8.DL
                         case OutputFormat.TS:
                             arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb {partOutputPath}.ts";
                             break;
-                        case OutputFormat.AAC:
-                            arguments += $@"-map 0:a -c copy -y {partOutputPath}.aac";
+                        case OutputFormat.M4A:
+                            arguments += $@"-map 0:a -c copy -y {partOutputPath}.m4a";
                             break;
                         case OutputFormat.SRT:
                             arguments += $@"-map 0 -y {partOutputPath}.srt";
@@ -609,7 +609,7 @@ namespace VideoDL_m3u8.DL
                 .Where(it =>
                     it.EndsWith(".mp4") ||
                     it.EndsWith(".ts") ||
-                    it.EndsWith(".aac") ||
+                    it.EndsWith(".m4a") ||
                     it.EndsWith(".srt"))
                 .OrderBy(it => it)
                 .ToList();
@@ -632,8 +632,8 @@ namespace VideoDL_m3u8.DL
                     return ".mp4";
                 if (outputFormat == OutputFormat.TS)
                     return ".ts";
-                if (outputFormat == OutputFormat.AAC)
-                    return ".aac";
+                if (outputFormat == OutputFormat.M4A)
+                    return ".m4a";
                 if (outputFormat == OutputFormat.SRT)
                     return ".srt";
                 return "";
@@ -676,8 +676,8 @@ namespace VideoDL_m3u8.DL
                     case OutputFormat.TS:
                         arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb {outputPath}.ts";
                         break;
-                    case OutputFormat.AAC:
-                        arguments += $@"-map 0:a -c copy -y {outputPath}.aac";
+                    case OutputFormat.M4A:
+                        arguments += $@"-map 0:a -c copy -y {outputPath}.m4a";
                         break;
                     case OutputFormat.SRT:
                         arguments += $@"-map 0 -y {outputPath}.srt";
@@ -949,6 +949,75 @@ namespace VideoDL_m3u8.DL
                 timer.Enabled = false;
                 progressEvent();
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Muxing video source and audio source
+        /// </summary>
+        /// <param name="workDir">Set video save directory.</param>
+        /// <param name="saveName">Set video save name.</param>
+        /// <param name="videoSourcePath">Set video source path.</param>
+        /// <param name="audioSourcePath">Set audio source path.</param>
+        /// <param name="outputFormat">Set video output format.</param>
+        /// <param name="clearSource">Set whether to clear source file after the muxing is completed.</param>
+        /// <param name="onMessage">Set callback function for FFmpeg warning or error messages.</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public async Task MuxingAsync(
+            string workDir, string saveName,
+            string videoSourcePath, string audioSourcePath,
+            MuxOutputFormat outputFormat = MuxOutputFormat.MP4,
+            bool clearSource = false, Action<string>? onMessage = null,
+            CancellationToken token = default)
+        {
+            if (string.IsNullOrWhiteSpace(workDir))
+                throw new Exception("Parameter workDir cannot be empty.");
+            if (string.IsNullOrWhiteSpace(saveName))
+                throw new Exception("Parameter saveName cannot be empty.");
+
+            saveName = saveName.FilterFileName();
+
+            if (!File.Exists(videoSourcePath))
+                throw new Exception("Not found video source.");
+            if (!File.Exists(audioSourcePath))
+                throw new Exception("Not found audio source.");
+
+            var tempPath = Path.Combine(workDir, $"{saveName}.muxing");
+            if (File.Exists(tempPath))
+                tempPath = Path.Combine(workDir,
+                    $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}.muxing");
+
+            var arguments = "";
+            arguments += $@"-loglevel warning -i ""{videoSourcePath}"" -i ""{audioSourcePath}"" ";
+
+            switch (outputFormat)
+            {
+                case MuxOutputFormat.MP4:
+                    var aacFilter = videoSourcePath.EndsWith(".ts") || audioSourcePath.EndsWith(".ts") ? "-bsf:a aac_adtstoasc" : "";
+                    arguments += $@"-acodec copy -vcodec copy -y -f mp4 {aacFilter} ""{tempPath}""";
+                    break;
+                case MuxOutputFormat.TS:
+                    arguments += $@"-acodec copy -vcodec copy -y -f mpegts -bsf:v h264_mp4toannexb ""{tempPath}""";
+                    break;
+                default:
+                    throw new Exception("OutputFormat not match.");
+            }
+
+            await FFmpeg.ExecuteAsync(arguments, null, onMessage, token);
+
+            var ext = outputFormat == MuxOutputFormat.MP4 ? ".mp4" : ".ts"; ;
+            var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
+            if (File.Exists(finishPath))
+                finishPath = Path.Combine(workDir,
+                    $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}{ext}");
+            File.Move(tempPath, finishPath);
+
+            if (clearSource)
+            {
+                File.Delete(videoSourcePath);
+                File.Delete(audioSourcePath);
             }
         }
     }
