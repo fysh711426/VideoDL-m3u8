@@ -197,7 +197,6 @@ namespace Example
                     Console.Write(msg);
                     Console.ResetColor();
                 });
-
             Console.WriteLine("Finish.");
             Console.ReadLine();
 
