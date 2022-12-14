@@ -483,13 +483,15 @@ namespace VideoDL_m3u8.DL
         /// <param name="saveName">Set video save name.</param>
         /// <param name="outputFormat">Set video output format.</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
+        /// <param name="keepFragmented">Set keep fragmented mp4.</param>
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
         /// <param name="onMessage">Set callback function for FFmpeg warning or error messages.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
-            OutputFormat outputFormat = OutputFormat.MP4, bool binaryMerge = false, 
+            OutputFormat outputFormat = OutputFormat.MP4, bool binaryMerge = false,
+            bool keepFragmented = false,
             bool clearTempFile = false, Action<string>? onMessage = null,
             CancellationToken token = default)
         {
@@ -562,13 +564,17 @@ namespace VideoDL_m3u8.DL
                         }
                     }
 
-                    if (format == "fmp4")
+                    if (format == "fmp4" && !keepFragmented)
                     {
                         var arguments = "";
                         arguments += $@"-loglevel warning -f mp4 -i ""{partOutputPath}{ext}"" ";
                         arguments += $@"-c copy -y -f mp4 ""{partOutputPath}.mp4""";
                         await FFmpeg.ExecuteAsync(arguments, null, onMessage, token);
                         File.Delete($"{partOutputPath}{ext}");
+                    }
+                    else
+                    {
+                        File.Move($"{partOutputPath}{ext}", $"{partOutputPath}.mp4");
                     }
                 }
                 else
