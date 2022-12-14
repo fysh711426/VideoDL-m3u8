@@ -484,6 +484,10 @@ namespace VideoDL_m3u8.DL
         /// <param name="outputFormat">Set video output format.</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="keepFragmented">Set keep fragmented mp4.</param>
+        /// <param name="discardcorrupt">Set ffmpeg discard corrupted packets.</param>
+        /// <param name="genpts">Set ffmpeg generate missing PTS if DTS is present.</param>
+        /// <param name="igndts">Set ffmpeg ignore DTS if PTS is set.</param>
+        /// <param name="ignidx">Set ffmpeg ignore index.</param>
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
         /// <param name="onMessage">Set callback function for FFmpeg warning or error messages.</param>
         /// <param name="token">Set cancellation token.</param>
@@ -491,7 +495,8 @@ namespace VideoDL_m3u8.DL
         /// <exception cref="Exception"></exception>
         public async Task MergeAsync(string workDir, string saveName,
             OutputFormat outputFormat = OutputFormat.MP4, bool binaryMerge = false,
-            bool keepFragmented = false,
+            bool keepFragmented = false, bool discardcorrupt = false,
+            bool genpts = false, bool igndts = false,  bool ignidx = false,
             bool clearTempFile = false, Action<string>? onMessage = null,
             CancellationToken token = default)
         {
@@ -539,6 +544,9 @@ namespace VideoDL_m3u8.DL
                     .Select(it => it.item)
                     .ToList();
 
+                if (partFiles.Count == 0)
+                    continue;
+
                 var partOutputPath = Path.Combine(tempDir, $"{part.Name}");
 
                 var format = hasMap ? "fmp4" : "ts";
@@ -574,6 +582,8 @@ namespace VideoDL_m3u8.DL
                     }
                     else
                     {
+                        if (File.Exists($"{partOutputPath}.mp4"))
+                            File.Delete($"{partOutputPath}.mp4");
                         File.Move($"{partOutputPath}{ext}", $"{partOutputPath}.mp4");
                     }
                 }
@@ -583,7 +593,19 @@ namespace VideoDL_m3u8.DL
                         partFiles.Select(it => Path.GetFileName(it)));
 
                     var arguments = "";
-                    arguments += $@"-loglevel warning -i concat:""{concatText}"" ";
+                    var fflags = "";
+                    fflags += discardcorrupt ? "+discardcorrupt" : "";
+                    fflags += genpts ? "+genpts" : "";
+                    fflags += igndts ? "+igndts" : "";
+                    fflags += ignidx ? "+ignidx" : "";
+                    fflags = fflags != "" ? $"-fflags {fflags}" : "";
+                    if (outputFormat != OutputFormat.MP4 &&
+                        outputFormat != OutputFormat.TS &&
+                        outputFormat != OutputFormat.M4A)
+                    {
+                        fflags = "";
+                    }
+                    arguments += $@"-loglevel warning {fflags} -i concat:""{concatText}"" ";
 
                     switch (outputFormat)
                     {
@@ -606,15 +628,6 @@ namespace VideoDL_m3u8.DL
                     await FFmpeg.ExecuteAsync(arguments, workingDir, onMessage, token);
                 }
             }
-
-            var files = Directory.GetFiles(tempDir)
-                .Where(it =>
-                    it.EndsWith(".mp4") ||
-                    it.EndsWith(".ts") ||
-                    it.EndsWith(".m4a") ||
-                    it.EndsWith(".srt"))
-                .OrderBy(it => it)
-                .ToList();
 
             void clear()
             {
@@ -639,6 +652,21 @@ namespace VideoDL_m3u8.DL
                 if (outputFormat == OutputFormat.SRT)
                     return ".srt";
                 return "";
+            }
+
+            var files = Directory.GetFiles(tempDir)
+                .Where(it =>
+                    it.EndsWith(".mp4") ||
+                    it.EndsWith(".ts") ||
+                    it.EndsWith(".m4a") ||
+                    it.EndsWith(".srt"))
+                .OrderBy(it => it)
+                .ToList();
+
+            if (files.Count == 0)
+            {
+                clear();
+                return;
             }
 
             if (files.Count == 1)
@@ -667,7 +695,19 @@ namespace VideoDL_m3u8.DL
                 File.WriteAllText(concatTextPath, manifest);
 
                 var arguments = "";
-                arguments += $@"-loglevel warning -f concat -safe 0 -i ""{concatTextPath}"" ";
+                var fflags = "";
+                fflags += discardcorrupt ? "+discardcorrupt" : "";
+                fflags += genpts ? "+genpts" : "";
+                fflags += igndts ? "+igndts" : "";
+                fflags += ignidx ? "+ignidx" : "";
+                fflags = fflags != "" ? $"-fflags {fflags}" : "";
+                if (outputFormat != OutputFormat.MP4 &&
+                    outputFormat != OutputFormat.TS &&
+                    outputFormat != OutputFormat.M4A)
+                {
+                    fflags = "";
+                }
+                arguments += $@"-loglevel warning {fflags} -f concat -safe 0 -i ""{concatTextPath}"" ";
 
                 switch (outputFormat)
                 {
