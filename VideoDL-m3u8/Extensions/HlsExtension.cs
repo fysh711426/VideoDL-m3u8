@@ -30,6 +30,7 @@ namespace VideoDL_m3u8.Extensions
                 })
                 .Where(it => it.quality <= _maxHeight)
                 .OrderByDescending(it => it.quality)
+                .ThenByDescending(it => it.item.Bandwidth)
                 .FirstOrDefault()?
                 .item;
         }

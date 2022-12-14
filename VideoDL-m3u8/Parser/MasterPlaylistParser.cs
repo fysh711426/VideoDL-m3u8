@@ -62,7 +62,7 @@ namespace VideoDL_m3u8.Parser
                             if (attrs.ContainsKey("PROGRAM-ID"))
                                 streamInfo.ProgramId = int.Parse(attrs["PROGRAM-ID"]);
                             if (attrs.ContainsKey("BANDWIDTH"))
-                                streamInfo.BandWidth = int.Parse(attrs["BANDWIDTH"]);
+                                streamInfo.Bandwidth = int.Parse(attrs["BANDWIDTH"]);
                             if (attrs.ContainsKey("FRAME-RATE"))
                                 streamInfo.FrameRate = double.Parse(attrs["FRAME-RATE"]);
                             if (attrs.ContainsKey("CODECS"))

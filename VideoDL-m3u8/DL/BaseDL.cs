@@ -4,12 +4,26 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using VideoDL_m3u8.Utils;
 
 namespace VideoDL_m3u8.DL
 {
     public class BaseDL
     {
         protected static readonly string userAgent = @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36";
+
+        protected static HttpClient CreateHttpClient(int timeout, string? proxy)
+        {
+            HttpClientHandler GetHandler()
+            {
+                if (proxy == null)
+                    return Http.ClientHandler;
+                return Http.GetClientHandler(proxy);
+            }
+            var httpClient = new HttpClient(GetHandler(), false);
+            httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
+            return httpClient;
+        }
 
         protected void SetRequestHeader(HttpRequestMessage request, string header)
         {

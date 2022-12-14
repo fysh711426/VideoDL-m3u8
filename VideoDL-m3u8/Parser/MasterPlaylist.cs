@@ -12,7 +12,7 @@ namespace VideoDL_m3u8.Parser
 
     public class StreamInfo
     {
-        public int BandWidth { get; set; }
+        public int Bandwidth { get; set; }
         public double FrameRate { get; set; }
         public int ProgramId { get; set; }
         public string Uri { get; set; } = "";

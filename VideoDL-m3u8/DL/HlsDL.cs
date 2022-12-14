@@ -19,19 +19,6 @@ namespace VideoDL_m3u8.DL
     {
         protected readonly HttpClient _httpClient;
 
-        private static HttpClient CreateHttpClient(int timeout, string? proxy)
-        {
-            HttpClientHandler GetHandler()
-            {
-                if (proxy == null)
-                    return Http.ClientHandler;
-                return Http.GetClientHandler(proxy);
-            }
-            var httpClient = new HttpClient(GetHandler(), false);
-            httpClient.Timeout = TimeSpan.FromMilliseconds(timeout);
-            return httpClient;
-        }
-
         /// <summary>
         /// Init HlsDL.
         /// </summary>
@@ -104,7 +91,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="manifest">Set m3u8 master manifest.</param>
         /// <param name="url">Set m3u8 url.</param>
         /// <returns></returns>
-        public MasterPlaylist ParseMasterPlaylist(string manifest, string url)
+        public MasterPlaylist ParseMasterPlaylist(string manifest, string url = "")
         {
             var parser = new MasterPlaylistParser();
             return parser.Parse(manifest, url);
@@ -116,7 +103,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="manifest">Set m3u8 media manifest.</param>
         /// <param name="url">Set m3u8 url.</param>
         /// <returns></returns>
-        public MediaPlaylist ParseMediaPlaylist(string manifest, string url)
+        public MediaPlaylist ParseMediaPlaylist(string manifest, string url = "")
         {
             var parser = new MediaPlaylistParser();
             return parser.Parse(manifest, url);
@@ -544,7 +531,7 @@ namespace VideoDL_m3u8.DL
                     {
                         item = it,
                         index = Path.GetFileNameWithoutExtension(it)
-                            .PadLeft(19 + 4, '_')
+                            .PadLeft(25, '0')
                     })
                     .OrderBy(it => it.index)
                     .Select(it => it.item)
@@ -560,7 +547,7 @@ namespace VideoDL_m3u8.DL
 
                 if (_binaryMerge)
                 {
-                    var ext = format == "fmp4" ? ".mp4" : ".ts";
+                    var ext = format == "fmp4" ? ".fmp4" : ".ts";
 
                     using (var fs = new FileStream(
                         $"{partOutputPath}{ext}", FileMode.Create, FileAccess.Write))
@@ -574,6 +561,15 @@ namespace VideoDL_m3u8.DL
                             }
                         }
                     }
+
+                    if (format == "fmp4")
+                    {
+                        var arguments = "";
+                        arguments += $@"-loglevel warning -f mp4 -i ""{partOutputPath}{ext}"" ";
+                        arguments += $@"-c copy -y -f mp4 ""{partOutputPath}.mp4""";
+                        await FFmpeg.ExecuteAsync(arguments, null, onMessage, token);
+                        File.Delete($"{partOutputPath}{ext}");
+                    }
                 }
                 else
                 {
@@ -582,8 +578,13 @@ namespace VideoDL_m3u8.DL
 
                     var arguments = "";
                     arguments += $@"-loglevel warning -i concat:""{concatText}"" ";
-                    
-                    switch (outputFormat)
+
+                    var _outputFormat = outputFormat;
+                    if (_outputFormat == OutputFormat.DEFAULT)
+                        _outputFormat = format == "fmp4" ?
+                            OutputFormat.MP4 : OutputFormat.TS;
+
+                    switch (_outputFormat)
                     {
                         case OutputFormat.MP4:
                             arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc {partOutputPath}.mp4";
@@ -643,7 +644,7 @@ namespace VideoDL_m3u8.DL
             {
                 var file = files.First();
                 var ext = Path.GetExtension(file);
-                if (ext == getFormatExt())
+                if (ext == getFormatExt() || outputFormat == OutputFormat.DEFAULT)
                 {
                     var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
                     if (File.Exists(finishPath))
@@ -667,7 +668,12 @@ namespace VideoDL_m3u8.DL
                 var arguments = "";
                 arguments += $@"-loglevel warning -f concat -safe 0 -i ""{concatTextPath}"" ";
 
-                switch (outputFormat)
+                var _outputFormat = outputFormat;
+                if (_outputFormat == OutputFormat.DEFAULT)
+                    _outputFormat = files.Any(it => it.EndsWith(".ts")) ?
+                        OutputFormat.TS : OutputFormat.MP4;
+
+                switch (_outputFormat)
                 {
                     case OutputFormat.MP4:
                         var aacFilter = files.Any(it => it.EndsWith(".ts")) ? "-bsf:a aac_adtstoasc" : "";
@@ -1007,7 +1013,7 @@ namespace VideoDL_m3u8.DL
 
             await FFmpeg.ExecuteAsync(arguments, null, onMessage, token);
 
-            var ext = outputFormat == MuxOutputFormat.MP4 ? ".mp4" : ".ts"; ;
+            var ext = outputFormat == MuxOutputFormat.MP4 ? ".mp4" : ".ts";
             var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
             if (File.Exists(finishPath))
                 finishPath = Path.Combine(workDir,
