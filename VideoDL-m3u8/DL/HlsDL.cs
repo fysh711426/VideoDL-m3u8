@@ -579,12 +579,7 @@ namespace VideoDL_m3u8.DL
                     var arguments = "";
                     arguments += $@"-loglevel warning -i concat:""{concatText}"" ";
 
-                    var _outputFormat = outputFormat;
-                    if (_outputFormat == OutputFormat.DEFAULT)
-                        _outputFormat = format == "fmp4" ?
-                            OutputFormat.MP4 : OutputFormat.TS;
-
-                    switch (_outputFormat)
+                    switch (outputFormat)
                     {
                         case OutputFormat.MP4:
                             arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc {partOutputPath}.mp4";
@@ -644,7 +639,7 @@ namespace VideoDL_m3u8.DL
             {
                 var file = files.First();
                 var ext = Path.GetExtension(file);
-                if (ext == getFormatExt() || outputFormat == OutputFormat.DEFAULT)
+                if (ext == getFormatExt())
                 {
                     var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
                     if (File.Exists(finishPath))
@@ -668,12 +663,7 @@ namespace VideoDL_m3u8.DL
                 var arguments = "";
                 arguments += $@"-loglevel warning -f concat -safe 0 -i ""{concatTextPath}"" ";
 
-                var _outputFormat = outputFormat;
-                if (_outputFormat == OutputFormat.DEFAULT)
-                    _outputFormat = files.Any(it => it.EndsWith(".ts")) ?
-                        OutputFormat.TS : OutputFormat.MP4;
-
-                switch (_outputFormat)
+                switch (outputFormat)
                 {
                     case OutputFormat.MP4:
                         var aacFilter = files.Any(it => it.EndsWith(".ts")) ? "-bsf:a aac_adtstoasc" : "";

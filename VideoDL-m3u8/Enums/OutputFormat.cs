@@ -2,7 +2,6 @@
 {
     public enum OutputFormat
     {
-        DEFAULT,
         MP4,
         TS,
         M4A,
