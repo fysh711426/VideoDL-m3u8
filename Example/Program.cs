@@ -114,7 +114,8 @@ namespace Example
                 try
                 {
                     await hlsDL.REC(
-                        workDir, saveName, url, header, 
+                        workDir, saveName, url, header,
+
                         progress: (args) =>
                         {
                             var print = args.Format;
@@ -129,6 +130,8 @@ namespace Example
 
                 // Merge m3u8 ts files by FFmpeg
                 await hlsDL.MergeAsync(workDir, saveName,
+                    discardcorrupt: true, genpts: true,
+                    igndts: true, ignidx: true,
                     clearTempFile: false,
                     onMessage: (msg) =>
                     {
@@ -227,6 +230,98 @@ namespace Example
                 await hlsDL.MergeAsync(workDir, saveName,
                     clearTempFile: true, binaryMerge: true,
                     outputFormat: OutputFormat.TS,
+                    onMessage: (msg) =>
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write(msg);
+                        Console.ResetColor();
+                    });
+            }
+        }
+
+        public static async Task Mpd(string[] args)
+        {
+            // mpd url
+            var url = "";
+            // http request header
+            var header = "";
+            // video save directory
+            var workDir = @"D:\Temp";
+            // video save name
+            var saveName = "Video";
+            var videoSaveName = $"{saveName}(Video)";
+            var audioSaveName = $"{saveName}(Audio)";
+
+            // Filter special characters
+            saveName = saveName.FilterFileName();
+
+            Console.WriteLine("Start Download...");
+
+            var dashDL = new DashDL();
+
+            // Download mpd manifest by url
+            var mpd = await dashDL.GetMpdAsync(url, header);
+
+            // Select mpd first period
+            var period = mpd.Periods.First();
+            var video = period.GetWithHighestQualityVideo();
+            var audio = period.GetWithHighestQualityAudio();
+
+            if (video == null || audio == null)
+                throw new Exception("Not found video or audio.");
+
+            // Parse mpd to m3u8 media playlist
+            var videoPlaylist = dashDL.ToMediaPlaylist(video);
+            var audioPlaylist = dashDL.ToMediaPlaylist(audio);
+
+            var hlsDL = new HlsDL();
+
+            // Download and merge video and audio
+            await downloadMerge("video", videoSaveName, videoPlaylist);
+            await downloadMerge("audio", audioSaveName, audioPlaylist);
+
+            // Muxing video source and audio source
+            await hlsDL.MuxingAsync(workDir, saveName,
+                Path.Combine(workDir, $"{videoSaveName}.mp4"),
+                Path.Combine(workDir, $"{audioSaveName}.mp4"),
+                outputFormat: MuxOutputFormat.MP4,
+                clearSource: true,
+                onMessage: (msg) =>
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Write(msg);
+                    Console.ResetColor();
+                });
+            Console.WriteLine("Finish.");
+            Console.ReadLine();
+
+            async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
+            {
+                // Download m3u8 segment key
+                var keys = null as Dictionary<string, string>;
+                var segmentKeys = hlsDL.GetKeys(mediaPlaylist.Parts);
+                if (segmentKeys.Count > 0)
+                    keys = await hlsDL.GetKeysDataAsync(segmentKeys, header);
+
+                Console.WriteLine($"Start {id} Download...");
+
+                // Download m3u8 ts files
+                await hlsDL.DownloadAsync(workDir, saveName,
+                    mediaPlaylist.Parts, header, keys,
+                    threads: 4, maxSpeed: 5 * 1024 * 1024,
+                    progress: (args) =>
+                    {
+                        var print = args.Format;
+                        var sub = Console.WindowWidth - 2 - print.Length;
+                        Console.Write("\r" + print + new string(' ', sub) + "\r");
+                    });
+
+                Console.WriteLine($"\nStart {id} Merge...");
+
+                // Merge mpd fmp4 files by FFmpeg
+                await hlsDL.MergeAsync(workDir, saveName,
+                    clearTempFile: true, binaryMerge: true,
+                    outputFormat: OutputFormat.MP4,
                     onMessage: (msg) =>
                     {
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
