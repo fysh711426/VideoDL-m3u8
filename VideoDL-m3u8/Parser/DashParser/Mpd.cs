@@ -19,6 +19,7 @@ namespace VideoDL_m3u8.DashParser
     public class AdaptationSet
     {
         public List<Representation> Representations { get; set; } = new();
+        public SegmentTemplate? SegmentTemplate { get; set; }
         public string BaseUrl { get; set; } = "";
         public string Lang { get; set; } = "";
         public bool SegmentAlignment { get; set; }
@@ -28,6 +29,7 @@ namespace VideoDL_m3u8.DashParser
     {
         public SegmentList SegmentList { get; set; } = new();
         public SegmentTemplate? SegmentTemplate { get; set; }
+        public SegmentBase? SegmentBase { get; set; }
         public string BaseUrl { get; set; } = "";
         public string Id { get; set; } = "";
         public string MimeType { get; set; } = "";
@@ -85,5 +87,11 @@ namespace VideoDL_m3u8.DashParser
         public int? T { get; set; }
         public int? D { get; set; }
         public int? R { get; set; }
+    }
+
+    public class SegmentBase
+    {
+        public Initialization? Initialization { get; set; }
+        public Range? IndexRange { get; set; }
     }
 }

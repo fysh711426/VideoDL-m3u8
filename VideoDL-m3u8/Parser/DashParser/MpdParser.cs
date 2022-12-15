@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Xml;
 using VideoDL_m3u8.Extensions;
 
@@ -11,8 +12,7 @@ namespace VideoDL_m3u8.DashParser
         public Mpd Parse(string manifest, string mpdUrl = "")
         {
             var element = GetMPD(manifest);
-            var mediaPresentationDuration = element
-                .GetAttribute("mediaPresentationDuration").ParseTimeSpan();
+            var mediaPresentationDuration = element.GetAttribute("mediaPresentationDuration");
             var childNodes = element.ChildNodes.AsEnumerable();
             var baseUrl = childNodes
                 .FirstOrDefault(it => it.Name == "BaseURL")?.InnerText ?? "";
@@ -24,7 +24,8 @@ namespace VideoDL_m3u8.DashParser
             {
                 Periods = periods,
                 BaseUrl = baseUrl,
-                MediaPresentationDuration = mediaPresentationDuration
+                MediaPresentationDuration = mediaPresentationDuration != "" ?
+                    mediaPresentationDuration.ParseTimeSpan() : null
             };
             mpd = GenerateSegmentTemplate(mpd);
             mpd = GenerateSegmentUrl(mpd, mpdUrl);
@@ -47,8 +48,7 @@ namespace VideoDL_m3u8.DashParser
 
         protected Period GetPeriod(XmlElement element)
         {
-            var duration = element
-                .GetAttribute("duration").ParseTimeSpan();
+            var duration = element.GetAttribute("duration");
             var childNodes = element.ChildNodes.AsEnumerable();
             var adaptationSets = childNodes
                 .Where(it => it.Name == "AdaptationSet")
@@ -57,7 +57,8 @@ namespace VideoDL_m3u8.DashParser
             return new Period
             {
                 AdaptationSets = adaptationSets,
-                Duration = duration
+                Duration = duration != "" ?
+                    duration.ParseTimeSpan() : null
             };
         }
 
@@ -72,9 +73,13 @@ namespace VideoDL_m3u8.DashParser
                 .ToList();
             var baseUrl = childNodes
                 .FirstOrDefault(it => it.Name == "BaseURL")?.InnerText ?? "";
+            var segmentTemplate = childNodes
+                .FirstOrDefault(it => it.Name == "SegmentTemplate");
             return new AdaptationSet
             {
                 Representations = representations,
+                SegmentTemplate = segmentTemplate != null ?
+                    GetSegmentTemplate((XmlElement)segmentTemplate) : null,
                 BaseUrl = baseUrl,
                 Lang = lang,
                 SegmentAlignment = segmentAlignment != "" ?
@@ -98,6 +103,8 @@ namespace VideoDL_m3u8.DashParser
                 .FirstOrDefault(it => it.Name == "SegmentList");
             var segmentTemplate = childNodes
                 .FirstOrDefault(it => it.Name == "SegmentTemplate");
+            var segmentBase = childNodes
+                .FirstOrDefault(it => it.Name == "SegmentBase");
             var baseUrl = childNodes
                 .FirstOrDefault(it => it.Name == "BaseURL")?.InnerText ?? "";
             return new Representation
@@ -106,6 +113,8 @@ namespace VideoDL_m3u8.DashParser
                     GetSegmentList((XmlElement)segmentList) : new(),
                 SegmentTemplate = segmentTemplate != null ?
                     GetSegmentTemplate((XmlElement)segmentTemplate) : null,
+                SegmentBase = segmentBase != null ?
+                    GetSegmentBase((XmlElement)segmentBase) : null,
                 BaseUrl = baseUrl,
                 Id = id,
                 MimeType = mimeType,
@@ -230,6 +239,25 @@ namespace VideoDL_m3u8.DashParser
                 .ToList();
         }
 
+        protected SegmentBase GetSegmentBase(XmlElement element)
+        {
+            var indexRange = element.GetAttribute("indexRange");
+            var childNodes = element.ChildNodes.AsEnumerable();
+            var initialization = childNodes
+                .FirstOrDefault(it => it.Name == "Initialization");
+            return new SegmentBase
+            {
+                Initialization = initialization != null ?
+                   GetInitialization((XmlElement)initialization) : null,
+                IndexRange = indexRange != "" ?
+                    new Range
+                    {
+                        From = long.Parse(indexRange.Split('-')[0]),
+                        To = long.Parse(indexRange.Split('-')[1])
+                    } : null
+            };
+        }
+
         protected Mpd GenerateSegmentUrl(Mpd mpd, string mpdUrl)
         {
             var baseUrl = mpdUrl;
@@ -273,9 +301,16 @@ namespace VideoDL_m3u8.DashParser
 
                             var indexUrl = repBaseUrl;
                             if (!string.IsNullOrEmpty(segmentUrl.Index))
+                            {
                                 indexUrl = string.IsNullOrEmpty(indexUrl) ?
                                     segmentUrl.Index : indexUrl.CombineUri(segmentUrl.Index);
-                            segmentUrl.Index = indexUrl;
+                                segmentUrl.Index = indexUrl;
+                            }
+                            if (string.IsNullOrEmpty(segmentUrl.Index) &&
+                                segmentUrl.IndexRange != null)
+                            {
+                                segmentUrl.Index = indexUrl;
+                            }
                         }
                     }
                 }
@@ -287,18 +322,19 @@ namespace VideoDL_m3u8.DashParser
         {
             foreach (var period in mpd.Periods)
             {
-                var periodDuration = 0.0d;
-                if (period.Duration.HasValue)
-                    periodDuration = period.Duration.Value.TotalSeconds;
+                var periodDuration = period.Duration?.TotalSeconds ?? 
+                    mpd.MediaPresentationDuration?.TotalSeconds ?? 0;
 
                 foreach (var adaptationSet in period.AdaptationSets)
                 {
+                    var adaSegmentTemplate = adaptationSet.SegmentTemplate;
+
                     foreach (var representation in adaptationSet.Representations)
                     {
                         var id = representation.Id;
-
                         var segmentList = representation.SegmentList;
-                        var segmentTemplate = representation.SegmentTemplate;
+
+                        var segmentTemplate = representation.SegmentTemplate ?? adaSegmentTemplate;
                         if (segmentTemplate != null)
                         {
                             if (!string.IsNullOrEmpty(segmentTemplate.Initialization))
@@ -358,6 +394,14 @@ namespace VideoDL_m3u8.DashParser
                                     segmentList.SegmentUrls.Add(segmentUrl);
                                 }
                             }
+                            continue;
+                        }
+
+                        var segmentBase = representation.SegmentBase;
+                        if (segmentBase != null)
+                        {
+                            var segmentUrl = new SegmentUrl();
+                            segmentList.SegmentUrls.Add(segmentUrl);
                         }
                     }
                 }

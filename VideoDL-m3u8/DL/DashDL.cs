@@ -53,7 +53,7 @@ namespace VideoDL_m3u8.DL
         /// format: key1:key1|key2:key2</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
-        public async Task<Mpd> GetMPDAsync(
+        public async Task<Mpd> GetMpdAsync(
             string url, string header = "", CancellationToken token = default)
         {
             var manifest = await GetManifestAsync(url, header, token);
@@ -67,7 +67,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="manifest">Set mpd manifest.</param>
         /// <param name="url">Set mpd url.</param>
         /// <returns></returns>
-        public Mpd ParseMPD(string manifest, string url = "")
+        public Mpd ParseMpd(string manifest, string url = "")
         {
             var parser = new MpdParser();
             return parser.Parse(manifest, url);
