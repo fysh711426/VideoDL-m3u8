@@ -10,19 +10,36 @@ namespace VideoDL_m3u8.Extensions
         {
             var _maxHeight = maxHeight ?? int.MaxValue;
             return source.AdaptationSets
-                .SelectMany(it => it.Representations)
-                .Where(it => it.MimeType.StartsWith("video"))
+                .SelectMany(it =>
+                {
+                    return it.Representations
+                        .Select(itt => new
+                        {
+                            height = itt.Height,
+                            width = itt.Width,
+                            bandwidth = itt.Bandwidth ?? 0,
+                            mimeType = itt.MimeType,
+                            contentType = itt.ContentType,
+                            ada = it,
+                            rep = itt
+                        });
+                })
+                .Where(it =>
+                    it.mimeType.StartsWith("video") ||
+                    it.contentType.StartsWith("video") ||
+                    it.ada.MimeType.StartsWith("video") ||
+                    it.ada.ContentType.StartsWith("video"))
                 .Select(it => new
                 {
-                    quality = it.Height ?? 0,
-                    bandwidth = it.Bandwidth ?? 0,
-                    item = it
+                    quality = it.height ?? 0,
+                    bandwidth = it.bandwidth,
+                    rep = it.rep
                 })
                 .Where(it => it.quality <= _maxHeight)
                 .OrderByDescending(it => it.quality)
                 .ThenByDescending(it => it.bandwidth)
                 .FirstOrDefault()?
-                .item;
+                .rep;
         }
 
         public static Representation? GetWithHighestQualityAudio(
@@ -37,14 +54,20 @@ namespace VideoDL_m3u8.Extensions
                             lang = it.Lang,
                             bandwidth = itt.Bandwidth ?? 0,
                             mimeType = itt.MimeType,
-                            item = itt
+                            contentType = itt.ContentType,
+                            ada = it,
+                            rep = itt
                         });
                 })
-                .Where(it => it.mimeType.StartsWith("audio"))
+                .Where(it =>
+                    it.mimeType.StartsWith("audio") ||
+                    it.contentType.StartsWith("audio") ||
+                    it.ada.MimeType.StartsWith("audio") ||
+                    it.ada.ContentType.StartsWith("audio"))
                 .Where(it => lang != null ? it.lang == lang : true)
                 .OrderByDescending(it => it.bandwidth)
                 .FirstOrDefault()?
-                .item;
+                .rep;
         }
     }
 }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Xml;
 using VideoDL_m3u8.Extensions;
 
@@ -65,6 +64,8 @@ namespace VideoDL_m3u8.DashParser
         protected AdaptationSet GetAdaptationSet(XmlElement element)
         {
             var lang = element.GetAttribute("lang");
+            var mimeType = element.GetAttribute("mimeType");
+            var contentType = element.GetAttribute("contentType");
             var segmentAlignment = element.GetAttribute("segmentAlignment");
             var childNodes = element.ChildNodes.AsEnumerable();
             var representations = childNodes
@@ -82,6 +83,8 @@ namespace VideoDL_m3u8.DashParser
                     GetSegmentTemplate((XmlElement)segmentTemplate) : null,
                 BaseUrl = baseUrl,
                 Lang = lang,
+                MimeType = mimeType,
+                ContentType = contentType,
                 SegmentAlignment = segmentAlignment != "" ?
                     segmentAlignment.ParseBool() ?? false : false
             };
@@ -91,6 +94,7 @@ namespace VideoDL_m3u8.DashParser
         {
             var id = element.GetAttribute("id");
             var mimeType = element.GetAttribute("mimeType");
+            var contentType = element.GetAttribute("contentType");
             var codecs = element.GetAttribute("codecs");
             var bandwidth = element.GetAttribute("bandwidth");
             var width = element.GetAttribute("width");
@@ -118,6 +122,7 @@ namespace VideoDL_m3u8.DashParser
                 BaseUrl = baseUrl,
                 Id = id,
                 MimeType = mimeType,
+                ContentType = contentType,
                 Codecs = codecs,
                 FrameRate = frameRate,
                 Bandwidth = bandwidth != "" ? int.Parse(bandwidth) : null,

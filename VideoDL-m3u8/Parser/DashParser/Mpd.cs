@@ -22,6 +22,8 @@ namespace VideoDL_m3u8.DashParser
         public SegmentTemplate? SegmentTemplate { get; set; }
         public string BaseUrl { get; set; } = "";
         public string Lang { get; set; } = "";
+        public string MimeType { get; set; } = "";
+        public string ContentType { get; set; } = "";
         public bool SegmentAlignment { get; set; }
     }
 
@@ -33,6 +35,7 @@ namespace VideoDL_m3u8.DashParser
         public string BaseUrl { get; set; } = "";
         public string Id { get; set; } = "";
         public string MimeType { get; set; } = "";
+        public string ContentType { get; set; } = "";
         public string Codecs { get; set; } = "";
         public string FrameRate { get; set; } = "";
         public int? Bandwidth { get; set; }
