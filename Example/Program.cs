@@ -115,7 +115,7 @@ namespace Example
                 {
                     await hlsDL.REC(
                         workDir, saveName, url, header,
-
+                        noSegStopTime: 60 * 1000,
                         progress: (args) =>
                         {
                             var print = args.Format;
@@ -132,7 +132,7 @@ namespace Example
                 await hlsDL.MergeAsync(workDir, saveName,
                     discardcorrupt: true, genpts: true,
                     igndts: true, ignidx: true,
-                    clearTempFile: false,
+                    clearTempFile: true,
                     onMessage: (msg) =>
                     {
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -318,7 +318,7 @@ namespace Example
 
                 Console.WriteLine($"\nStart {id} Merge...");
 
-                // Merge mpd fmp4 files by FFmpeg
+                // Merge mpd mp4 files by FFmpeg
                 await hlsDL.MergeAsync(workDir, saveName,
                     clearTempFile: true, binaryMerge: true,
                     outputFormat: OutputFormat.MP4,
