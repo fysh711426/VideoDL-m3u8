@@ -109,7 +109,8 @@ await hlsDL.DownloadAsync(workDir, saveName,
 Console.WriteLine("\nStart Merge...");
 
 // Merge m3u8 ts files by FFmpeg
-await hlsDL.MergeAsync(workDir, saveName, true,
+await hlsDL.MergeAsync(workDir, saveName, 
+    clearTempFile: true,
     onMessage: (msg) =>
     {
         Console.ForegroundColor = ConsoleColor.DarkYellow;

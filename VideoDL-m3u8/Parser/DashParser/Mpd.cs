@@ -8,6 +8,8 @@ namespace VideoDL_m3u8.DashParser
         public List<Period> Periods { get; set; } = new();
         public string BaseUrl { get; set; } = "";
         public TimeSpan? MediaPresentationDuration { get; set; }
+        public string Manifest { get; set; } = "";
+        public string Url { get; set; } = "";
     }
 
     public class Period

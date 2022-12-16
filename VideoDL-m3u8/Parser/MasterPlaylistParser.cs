@@ -13,6 +13,7 @@ namespace VideoDL_m3u8.Parser
             using (var reader = new StringReader(manifest))
             {
                 var playlist = new MasterPlaylist();
+                playlist.Url = m3u8Url;
                 playlist.Manifest = manifest;
 
                 var streamInfo = new StreamInfo();

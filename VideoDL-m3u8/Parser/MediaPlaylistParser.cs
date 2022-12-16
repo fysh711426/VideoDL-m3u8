@@ -14,6 +14,7 @@ namespace VideoDL_m3u8.Parser
             using (var reader = new StringReader(manifest))
             {
                 var playlist = new MediaPlaylist();
+                playlist.Url = m3u8Url;
                 playlist.Manifest = manifest;
 
                 var segment = new Segment();

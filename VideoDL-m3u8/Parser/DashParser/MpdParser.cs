@@ -21,6 +21,8 @@ namespace VideoDL_m3u8.DashParser
                 .ToList();
             var mpd = new Mpd
             {
+                Url = mpdUrl,
+                Manifest = manifest,
                 Periods = periods,
                 BaseUrl = baseUrl,
                 MediaPresentationDuration = mediaPresentationDuration != "" ?

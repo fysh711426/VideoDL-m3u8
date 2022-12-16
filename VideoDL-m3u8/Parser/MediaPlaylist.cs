@@ -14,6 +14,7 @@ namespace VideoDL_m3u8.Parser
         public string PlaylistType { get; set; } = "";
         public List<Part> Parts { get; set; } = new();
         public string Manifest { get; set; } = "";
+        public string Url { get; set; } = "";
     }
 
     public class Part

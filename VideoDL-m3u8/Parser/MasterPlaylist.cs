@@ -8,6 +8,7 @@ namespace VideoDL_m3u8.Parser
         public List<StreamInfo> StreamInfos { get; set; } = new();
         public List<MediaGroup> MediaGroups { get; set; } = new();
         public string Manifest { get; set; } = "";
+        public string Url { get; set; } = "";
     }
 
     public class StreamInfo
