@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -123,6 +125,36 @@ namespace VideoDL_m3u8.DL
                 }
             }
             await load(url);
+        }
+
+        protected async Task<Dictionary<string, string>> GetHeadersAsync(HttpClient httpClient,
+            string url, string header, long? rangeFrom = null, long? rangeTo = null,
+            CancellationToken token = default)
+        {
+            
+            async Task<Dictionary<string, string>> get(string url)
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    if (rangeFrom != null || rangeTo != null)
+                        request.Headers.Range = new RangeHeaderValue(rangeFrom, rangeTo);
+                    SetRequestHeader(request, header);
+                    using (var response = await httpClient.SendAsync(request,
+                        HttpCompletionOption.ResponseHeadersRead, token))
+                    {
+                        if (response.Headers.Location != null)
+                            return await get(response.Headers.Location.AbsoluteUri);
+                        response.EnsureSuccessStatusCode();
+                        var headerDict = new Dictionary<string, string>();
+                        foreach(var item in response.Content.Headers)
+                        {
+                            headerDict[item.Key] = string.Join("|", item.Value);
+                        }
+                        return headerDict;
+                    }
+                }
+            }
+            return await get(url);
         }
     }
 }
