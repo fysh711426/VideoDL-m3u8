@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8.Events;
@@ -37,13 +36,23 @@ namespace VideoDL_m3u8.DL
         }
 
         /// <summary>
-        /// Get mpd manifest by url.
+        /// Download http file.
         /// </summary>
-        /// <param name="url">Set mpd download url.</param>
+        /// <param name="workDir">Set file download directory.</param>
+        /// <param name="saveName">Set file save name.</param>
+        /// <param name="url">Set file url.</param>
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
+        /// <param name="threads">Set the number of threads to download.</param>
+        /// <param name="delay">Set http request delay.(millisecond)</param>
+        /// <param name="maxRetry">Set the maximum number of download retries.</param>
+        /// <param name="maxSpeed">Set the maximum download speed.(byte)
+        /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
+        /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
+        /// <param name="progress">Set progress callback.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public async Task DownloadAsync(
             string workDir, string saveName, string url, string header = "",
             int threads = 1, int delay = 200, int maxRetry = 20,
@@ -70,37 +79,66 @@ namespace VideoDL_m3u8.DL
             if (!Directory.Exists(tempDir))
                 Directory.CreateDirectory(tempDir);
 
-            async Task<(long?, string?)> getContent(long? from, long? to)
-            {
-                var headerDict = await GetHeadersAsync(_httpClient,
-                    url, header, from, to, token);
-                var contentLength = null as long?;
-                if (headerDict.TryGetValue("Content-Length", out var sLength))
-                    contentLength = long.Parse(sLength);
-                var contentType = null as string;
-                if (headerDict.TryGetValue("Content-Type", out var sType))
-                    contentType = sType;
-                return (contentLength, contentType);
-            }
-
-            var isResume = true;
             var chunkSize = 4 * 1024 * 1024;
 
-            var (rangeTest, _) = await getContent(0, 0);
-            var (contentLength, contentType) = await getContent(0, null);
+            var respHeaders = await GetHeadersAsync(_httpClient,
+                url, header, 0, 0, token);
 
+            var rangeTest = respHeaders.ContentLength;
+            var contentType = respHeaders.ContentType.MediaType;
+            var contentLength = respHeaders.ContentRange.Length;
+            
             var ext = "";
             if (contentType != null)
                 ext = MimeTypeMap.GetExtension(contentType);
             else
                 ext = Path.GetExtension(new Uri(url).AbsolutePath);
+;
+            bool getResume()
+            {
+                if (rangeTest != 1)
+                    return false;
+                if (contentLength == null)
+                    return false;
+                if (contentLength <= chunkSize)
+                    return false;
+                return true;
+            }
+            var isResume = getResume();
 
-            if (rangeTest != 1)
-                isResume = false;
-            if (contentLength == null)
-                isResume = false;
-            if (contentLength <= chunkSize)
-                isResume = false;
+            var retry = 0;
+            var downloadBytes = 0L;
+            var intervalDownloadBytes = 0L;
+
+            void progressEvent()
+            {
+                try
+                {
+                    if (progress != null)
+                    {
+                        var totalBytes = contentLength;
+                        var speed = intervalDownloadBytes / interval * 1000;
+                        var percentage = totalBytes != null ?
+                            Number.Div(downloadBytes, totalBytes.Value) :
+                            null as double?;
+                        var eta = totalBytes != null ?
+                            (int)Number.Div(totalBytes.Value - downloadBytes, speed) :
+                            null as int?;
+                        var args = new HttpProgressEventArgs
+                        {
+                            DownloadBytes = downloadBytes,
+                            MaxRetry = maxRetry,
+                            Retry = retry,
+                            Percentage = percentage,
+                            TotalBytes = totalBytes,
+                            Speed = speed,
+                            Eta = eta
+                        };
+                        progress(args);
+                    }
+                }
+                catch { }
+            }
 
             if (isResume)
             {
@@ -139,11 +177,8 @@ namespace VideoDL_m3u8.DL
                     index++;
                 }
 
-                var retry = 0;
                 var total = 0;
                 var finish = 0;
-                var downloadBytes = 0L;
-                var intervalDownloadBytes = 0L;
                 total = works.Count;
 
                 async Task<long> copyToAsync(Stream s, Stream d,
@@ -234,34 +269,6 @@ namespace VideoDL_m3u8.DL
                     }, 10 * 1000, maxRetry, token);
                 }
 
-                void progressEvent()
-                {
-                    try
-                    {
-                        if (progress != null)
-                        {
-                            var percentage = Number.Div(finish, total);
-                            var totalBytes = (long)Number.Div(downloadBytes * total, finish);
-                            var speed = intervalDownloadBytes / interval * 1000;
-                            var eta = (int)Number.Div(totalBytes - downloadBytes, speed);
-                            var args = new HttpProgressEventArgs
-                            {
-                                Total = total,
-                                Finish = finish,
-                                DownloadBytes = downloadBytes,
-                                MaxRetry = maxRetry,
-                                Retry = retry,
-                                Percentage = percentage,
-                                TotalBytes = totalBytes,
-                                Speed = speed,
-                                Eta = eta
-                            };
-                            progress(args);
-                        }
-                    }
-                    catch { }
-                }
-
                 var stop = false;
                 var timer = new System.Timers.Timer(interval);
                 timer.AutoReset = true;
@@ -337,7 +344,101 @@ namespace VideoDL_m3u8.DL
             // !isResume
             else
             {
+                var tempPath = Path.Combine(tempDir, $"temp{ext}");
 
+                async Task func()
+                {
+                    await RetryTask.Run(async (r, ex) =>
+                    {
+                        downloadBytes = 0L;
+                        intervalDownloadBytes = 0L;
+                        retry = r;
+
+                        await LoadStreamAsync(_httpClient, url, header,
+                            async (stream, contentLength) =>
+                            {
+                                using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                                {
+                                    var buffer = new byte[4096];
+                                    var size = 0;
+                                    var limit = 0L;
+                                    if (maxSpeed != null)
+                                        limit = (long)(0.001 * interval * maxSpeed.Value - 1024);
+                                    while (true)
+                                    {
+                                        size = await stream.ReadAsync(buffer, 0, buffer.Length, token);
+                                        if (size <= 0)
+                                            break;
+                                        await fs.WriteAsync(buffer, 0, size, token);
+                                        Interlocked.Add(ref downloadBytes, size);
+                                        Interlocked.Add(ref intervalDownloadBytes, size);
+                                        if (maxSpeed != null)
+                                        {
+                                            while (intervalDownloadBytes >= limit)
+                                            {
+                                                await Task.Delay(1, token);
+                                            }
+                                        }
+                                    }
+                                }
+                            }, 0, null, token);
+                    }, 10 * 1000, maxRetry, token);
+                }
+
+                var stop = false;
+                var timer = new System.Timers.Timer(interval);
+                timer.AutoReset = true;
+                timer.Elapsed += delegate
+                {
+                    if (!stop)
+                    {
+                        progressEvent();
+                        Interlocked.Exchange(ref intervalDownloadBytes, 0);
+                    }
+                };
+
+                void finish()
+                {
+                    if (contentLength != null)
+                    {
+                        var fileInfo = new FileInfo(tempPath);
+                        if (fileInfo.Length != contentLength)
+                            throw new Exception("File size not match content-length.");
+                    }
+                    var finishPath = Path.Combine(workDir, $"{saveName}{ext}");
+                    if (File.Exists(finishPath))
+                        finishPath = Path.Combine(workDir,
+                            $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}{ext}");
+                    File.Move(tempPath, finishPath);
+                }
+
+                void clear()
+                {
+                    try
+                    {
+                        Directory.Delete(tempDir, true);
+                    }
+                    catch { }
+                }
+
+                try
+                {
+                    timer.Enabled = true;
+                    await func();
+                    finish();
+                    clear();
+                    stop = true;
+                    timer.Enabled = false;
+                    progressEvent();
+
+                }
+                catch
+                {
+                    stop = true;
+                    timer.Enabled = false;
+                    progressEvent();
+                    throw;
+                }
             }
         }
     }
