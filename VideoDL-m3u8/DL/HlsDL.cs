@@ -215,9 +215,11 @@ namespace VideoDL_m3u8.DL
 
             keys = keys ?? new Dictionary<string, string>();
 
-            saveName = saveName.FilterFileName();
+            // saveName = saveName.FilterFileName();
 
             header = string.IsNullOrWhiteSpace(header) ? "" : header;
+
+            threads = Math.Max(threads, 1);
 
             var tempDir = Path.Combine(workDir, saveName);
             if (!Directory.Exists(tempDir))
@@ -505,7 +507,7 @@ namespace VideoDL_m3u8.DL
             if (string.IsNullOrWhiteSpace(saveName))
                 throw new Exception("Parameter saveName cannot be empty.");
 
-            saveName = saveName.FilterFileName();
+            // saveName = saveName.FilterFileName();
 
             var tempDir = Path.Combine(workDir, saveName);
             if (!Directory.Exists(tempDir))
@@ -1019,7 +1021,7 @@ namespace VideoDL_m3u8.DL
             if (string.IsNullOrWhiteSpace(saveName))
                 throw new Exception("Parameter saveName cannot be empty.");
 
-            saveName = saveName.FilterFileName();
+            // saveName = saveName.FilterFileName();
 
             if (!File.Exists(videoSourcePath))
                 throw new Exception("Not found video source.");

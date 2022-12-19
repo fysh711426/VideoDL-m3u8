@@ -69,7 +69,7 @@ namespace VideoDL_m3u8.DL
             if (maxSpeed != null && maxSpeed.Value < 1024)
                 throw new Exception("Parameter maxSpeed must be greater than or equal to 1024.");
 
-            saveName = saveName.FilterFileName();
+            // saveName = saveName.FilterFileName();
 
             header = string.IsNullOrWhiteSpace(header) ? "" : header;
 
@@ -140,6 +140,33 @@ namespace VideoDL_m3u8.DL
                 catch { }
             }
 
+            async Task<long> copyToAsync(Stream s, Stream d, int threads, CancellationToken token = default)
+            {
+                var bytes = 0L;
+                var buffer = new byte[4096];
+                var size = 0;
+                var limit = 0L;
+                if (maxSpeed != null)
+                    limit = (long)(0.001 * interval * maxSpeed.Value - threads * 1024);
+                while (true)
+                {
+                    size = await s.ReadAsync(buffer, 0, buffer.Length, token);
+                    if (size <= 0)
+                        return bytes;
+                    await d.WriteAsync(buffer, 0, size, token);
+                    bytes += size;
+                    Interlocked.Add(ref intervalDownloadBytes, size);
+                    Interlocked.Add(ref downloadBytes, size);
+                    if (maxSpeed != null)
+                    {
+                        while (intervalDownloadBytes >= limit)
+                        {
+                            await Task.Delay(1, token);
+                        }
+                    }
+                }
+            }
+
             if (isResume)
             {
                 var works = new List<(
@@ -180,33 +207,6 @@ namespace VideoDL_m3u8.DL
                 var total = 0;
                 var finish = 0;
                 total = works.Count;
-
-                async Task<long> copyToAsync(Stream s, Stream d,
-                    CancellationToken token = default)
-                {
-                    var bytes = 0L;
-                    var buffer = new byte[4096];
-                    var size = 0;
-                    var limit = 0L;
-                    if (maxSpeed != null)
-                        limit = (long)(0.001 * interval * maxSpeed.Value - threads * 1024);
-                    while (true)
-                    {
-                        size = await s.ReadAsync(buffer, 0, buffer.Length, token);
-                        if (size <= 0)
-                            return bytes;
-                        await d.WriteAsync(buffer, 0, size, token);
-                        bytes += size;
-                        Interlocked.Add(ref intervalDownloadBytes, size);
-                        if (maxSpeed != null)
-                        {
-                            while (intervalDownloadBytes >= limit)
-                            {
-                                await Task.Delay(1, token);
-                            }
-                        }
-                    }
-                }
 
                 async Task func()
                 {
@@ -252,10 +252,9 @@ namespace VideoDL_m3u8.DL
                                         async Task<Stream> download()
                                         {
                                             var ms = new MemoryStream();
-                                            var size = await copyToAsync(stream, ms, _token);
+                                            var size = await copyToAsync(stream, ms, threads, _token);
                                             if (size != contentLength)
                                                 throw new Exception("Chunk size not match content-length.");
-                                            Interlocked.Add(ref downloadBytes, size);
                                             ms.Position = 0;
                                             return ms;
                                         }
@@ -359,27 +358,7 @@ namespace VideoDL_m3u8.DL
                             {
                                 using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                 {
-                                    var buffer = new byte[4096];
-                                    var size = 0;
-                                    var limit = 0L;
-                                    if (maxSpeed != null)
-                                        limit = (long)(0.001 * interval * maxSpeed.Value - 1024);
-                                    while (true)
-                                    {
-                                        size = await stream.ReadAsync(buffer, 0, buffer.Length, token);
-                                        if (size <= 0)
-                                            break;
-                                        await fs.WriteAsync(buffer, 0, size, token);
-                                        Interlocked.Add(ref downloadBytes, size);
-                                        Interlocked.Add(ref intervalDownloadBytes, size);
-                                        if (maxSpeed != null)
-                                        {
-                                            while (intervalDownloadBytes >= limit)
-                                            {
-                                                await Task.Delay(1, token);
-                                            }
-                                        }
-                                    }
+                                    await copyToAsync(stream, fs, 1, token);
                                 }
                             }, 0, null, token);
                     }, 10 * 1000, maxRetry, token);
