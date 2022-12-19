@@ -6,7 +6,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8.Events;
-using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Utils;
 
 namespace VideoDL_m3u8.DL

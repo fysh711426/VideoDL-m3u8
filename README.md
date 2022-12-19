@@ -58,6 +58,7 @@ var header = "";
 var workDir = @"D:\Temp";
 // video save name
 var saveName = "Video";
+saveName = saveName.FilterFileName();
 
 Console.WriteLine("Start Download...");
 
@@ -191,11 +192,9 @@ var header = "";
 var workDir = @"D:\Temp";
 // video save name
 var saveName = "Video";
+saveName = saveName.FilterFileName();
 var videoSaveName = $"{saveName}(Video)";
 var audioSaveName = $"{saveName}(Audio)";
-
-// Filter special characters
-saveName = saveName.FilterFileName();
 
 Console.WriteLine("Start Download...");
 
@@ -289,11 +288,9 @@ var header = "";
 var workDir = @"D:\Temp";
 // video save name
 var saveName = "Video";
+saveName = saveName.FilterFileName();
 var videoSaveName = $"{saveName}(Video)";
 var audioSaveName = $"{saveName}(Audio)";
-
-// Filter special characters
-saveName = saveName.FilterFileName();
 
 Console.WriteLine("Start Download...");
 
@@ -369,6 +366,38 @@ async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist
             Console.ResetColor();
         });
 }
+```
+
+---  
+
+### Http Example  
+
+```C#
+// video url
+var url = "";
+// http request header
+var header = "";
+// video save directory
+var workDir = @"D:\Temp";
+// video save name
+var saveName = "Video";
+saveName = saveName.FilterFileName();
+
+Console.WriteLine("Start Download...");
+
+var httpDL = new HttpDL();
+
+// Download video file
+await httpDL.DownloadAsync(workDir, saveName, 
+    url, header, threads: 4, maxSpeed: 5 * 1024 * 1024,
+    progress: (args) =>
+    {
+        var print = args.Format;
+        var sub = Console.WindowWidth - 2 - print.Length;
+        Console.Write("\r" + print + new string(' ', sub) + "\r");
+    });
+Console.WriteLine("\nFinish.");
+Console.ReadLine();
 ```
 
 ---  
