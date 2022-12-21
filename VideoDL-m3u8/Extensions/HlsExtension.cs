@@ -8,6 +8,16 @@ namespace VideoDL_m3u8.Extensions
 {
     public static class HlsExtension
     {
+        public static bool IsM3U8(this string manifest)
+        {
+            return manifest.Contains("#EXTM3U");
+        }
+
+        public static bool IsMPD(this string manifest)
+        {
+            return manifest.Contains("<MPD ") || manifest.Contains("<MPD>");
+        }
+
         public static bool IsLive(this MediaPlaylist mediaPlaylist)
         {
             return !mediaPlaylist.EndList;

@@ -80,7 +80,7 @@ namespace VideoDL_m3u8.DL
 
             var chunkSize = 4 * 1024 * 1024;
 
-            var respHeaders = await GetHeadersAsync(_httpClient,
+            var (respHeaders, _) = await GetHeadersAsync(_httpClient,
                 url, header, 0, 0, token);
 
             var rangeTest = respHeaders.ContentLength;
@@ -92,7 +92,7 @@ namespace VideoDL_m3u8.DL
                 ext = MimeTypeMap.GetExtension(contentType);
             else
                 ext = Path.GetExtension(new Uri(url).AbsolutePath);
-;
+
             bool getResume()
             {
                 if (rangeTest != 1)
@@ -244,7 +244,7 @@ namespace VideoDL_m3u8.DL
                             var savePath = $"{filePath}{chunkExt}";
 
                             await LoadStreamAsync(_httpClient, url, header,
-                                async (stream, contentLength) =>
+                                async (stream, contentLength, _) =>
                                 {
                                     using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                     {
@@ -353,7 +353,7 @@ namespace VideoDL_m3u8.DL
                         retry = r;
 
                         await LoadStreamAsync(_httpClient, url, header,
-                            async (stream, contentLength) =>
+                            async (stream, contentLength, _) =>
                             {
                                 using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                 {

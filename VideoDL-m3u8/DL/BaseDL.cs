@@ -65,11 +65,12 @@ namespace VideoDL_m3u8.DL
             return (data, requestUrl != "" ? requestUrl : url);
         }
 
-        protected async Task<byte[]> GetBytesAsync(
-            HttpClient httpClient, string url, string header, 
+        protected async Task<(byte[] data, string url)> GetBytesAsync(
+            HttpClient httpClient, string url, string header,
             long? rangeFrom = null, long? rangeTo = null,
             CancellationToken token = default)
         {
+            var requestUrl = "";
             async Task<byte[]> get(string url)
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
@@ -82,20 +83,23 @@ namespace VideoDL_m3u8.DL
                         if (response.Headers.Location != null)
                             return await get(response.Headers.Location.AbsoluteUri);
                         response.EnsureSuccessStatusCode();
+                        requestUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
                         token.ThrowIfCancellationRequested();
                         // return await response.Content.ReadAsByteArrayAsync(token);
                         return await response.Content.ReadAsByteArrayAsync();
                     }
                 }
             }
-            return await get(url);
+            var data = await get(url);
+            return (data, requestUrl != "" ? requestUrl : url);
         }
 
-        protected async Task LoadStreamAsync(HttpClient httpClient, 
-            string url, string header, Func<Stream, long?, Task> callback,
+        protected async Task<string> LoadStreamAsync(HttpClient httpClient,
+            string url, string header, Func<Stream, long?, string, Task> callback,
             long? rangeFrom = null, long? rangeTo = null,
             CancellationToken token = default)
         {
+            var requestUrl = "";
             async Task load(string url)
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
@@ -113,23 +117,27 @@ namespace VideoDL_m3u8.DL
                             return;
                         }
                         response.EnsureSuccessStatusCode();
+                        requestUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
                         token.ThrowIfCancellationRequested();
                         // using (var stream = await response.Content.ReadAsStreamAsync(token))
                         using (var stream = await response.Content.ReadAsStreamAsync())
                         {
-                            await callback(stream, response.Content.Headers.ContentLength);
+                            await callback(stream, 
+                                response.Content.Headers.ContentLength,
+                                response.Content.Headers.ContentType.CharSet);
                         }
                     }
                 }
             }
             await load(url);
+            return requestUrl != "" ? requestUrl : url;
         }
 
-        protected async Task<HttpContentHeaders> GetHeadersAsync(HttpClient httpClient,
+        protected async Task<(HttpContentHeaders headers, string url)> GetHeadersAsync(HttpClient httpClient,
             string url, string header, long? rangeFrom = null, long? rangeTo = null,
             CancellationToken token = default)
         {
-            
+            var requestUrl = "";
             async Task<HttpContentHeaders> get(string url)
             {
                 using (var request = new HttpRequestMessage(HttpMethod.Get, url))
@@ -143,11 +151,13 @@ namespace VideoDL_m3u8.DL
                         if (response.Headers.Location != null)
                             return await get(response.Headers.Location.AbsoluteUri);
                         response.EnsureSuccessStatusCode();
+                        requestUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
                         return response.Content.Headers;
                     }
                 }
             }
-            return await get(url);
+            var headers = await get(url);
+            return (headers, requestUrl != "" ? requestUrl : url);
         }
     }
 }

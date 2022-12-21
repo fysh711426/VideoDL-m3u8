@@ -166,7 +166,7 @@ namespace VideoDL_m3u8.DL
             SegmentKey segmentKey, string header = "",
             CancellationToken token = default)
         {
-            var data = await GetBytesAsync(_httpClient,
+            var (data, _) = await GetBytesAsync(_httpClient,
                 segmentKey.Uri, header, null, null, token);
             return Convert.ToBase64String(data);
         }
@@ -337,7 +337,7 @@ namespace VideoDL_m3u8.DL
                         var savePath = $"{filePath}{ext}";
 
                         await LoadStreamAsync(_httpClient, segment.Uri, header,
-                            async (stream, contentLength) =>
+                            async (stream, contentLength, _) =>
                             {
                                 using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
                                 {
