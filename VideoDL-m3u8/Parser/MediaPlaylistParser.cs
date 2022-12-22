@@ -239,6 +239,8 @@ namespace VideoDL_m3u8.Parser
                         continue;
                     }
                 }
+                if (!playlist.IsM3U)
+                    throw new Exception("Not found EXTM3U tag.");
                 return playlist;
             }
         }

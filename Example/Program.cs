@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8;
-using VideoDL_m3u8.DL;
 using VideoDL_m3u8.Enums;
 using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
@@ -26,9 +25,22 @@ namespace Example
             var saveName = "Video";
 
             var videoDL = new VideoDL();
-            // Download m3u8/mpd/http file.
+
+            // Download m3u8/mpd/http video
             await videoDL.DownloadAsync(
                 workDir, saveName, url, header, clearTempFile: true);
+
+            // Download m3u8 video
+            await videoDL.HlsDownloadAsync(
+                workDir, saveName, url, header, clearTempFile: true);
+
+            // Download mpd video
+            await videoDL.DashDownloadAsync(
+                workDir, saveName, url, header, clearTempFile: true);
+
+            // Download http video
+            await videoDL.HttpDownloadAsync(
+                workDir, saveName, url, header);
         }
 
         public static async Task Hls(string[] args)

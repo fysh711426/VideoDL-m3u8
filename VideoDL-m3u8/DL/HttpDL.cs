@@ -83,9 +83,9 @@ namespace VideoDL_m3u8.DL
             var (respHeaders, _) = await GetHeadersAsync(_httpClient,
                 url, header, 0, 0, token);
 
-            var rangeTest = respHeaders.ContentLength;
-            var contentType = respHeaders.ContentType.MediaType;
-            var contentLength = respHeaders.ContentRange.Length;
+            var rangeTest = respHeaders?.ContentLength;
+            var contentType = respHeaders?.ContentType?.MediaType;
+            var contentLength = respHeaders?.ContentRange?.Length;
             
             var ext = "";
             if (contentType != null)

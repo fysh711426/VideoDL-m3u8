@@ -1,6 +1,6 @@
 # VideoDL-m3u8  
 
-This is a m3u8 video downloader which can download ts files and merge to mp4 video using FFmpeg.  
+This is m3u8/mpd/http video downloader which can download ts files and merge to mp4 video using FFmpeg.  
 
 * Support m3u8 manifest parsing  
 * Support ts or fmp4 file download  
@@ -60,10 +60,24 @@ var workDir = @"D:\Temp";
 var saveName = "Video";
 
 var videoDL = new VideoDL();
-// Download m3u8/mpd/http file.
+
+// Download m3u8/mpd/http video
 await videoDL.DownloadAsync(
     workDir, saveName, url, header, clearTempFile: true);
+
+// Download m3u8 video
+await videoDL.HlsDownloadAsync(
+    workDir, saveName, url, header, clearTempFile: true);
+
+// Download mpd video
+await videoDL.DashDownloadAsync(
+    workDir, saveName, url, header, clearTempFile: true);
+
+// Download http video
+await videoDL.HttpDownloadAsync(
+    workDir, saveName, url, header);
 ```
+
 ---  
 
 ### Proxy example  
@@ -78,9 +92,10 @@ var videoDL = new VideoDL(
 
 ---  
 
-### Hls example  
-
+> **Note**  
 > More detailed operations.  
+
+### Hls example  
 
 ```C#
 // m3u8 url
@@ -441,6 +456,111 @@ Console.ReadLine();
 
 ### Documentation  
 
+* **VideoDL.DownloadAsync**  
+
+```C#
+// Download m3u8/mpd/http video
+public virtual async Task DownloadAsync(
+    string workDir, 
+    string saveName, 
+    string url, 
+    string header = "",
+    int threads = 1, 
+    int delay = 200, 
+    int maxRetry = 20, 
+    long? maxSpeed = null,
+    int interval = 1000, 
+    bool checkComplete = true, 
+    int? noSegStopTime = null,
+    bool binaryMerge = false, 
+    bool keepFragmented = false, 
+    bool discardcorrupt = false,
+    bool genpts = false, 
+    bool igndts = false, 
+    bool ignidx = false,
+    OutputFormat outputFormat = OutputFormat.MP4,
+    bool clearTempFile = false, 
+    bool clearSource = false,
+    Func<List<Part>, List<Part>>? partFilter = null,
+    Func<List<Period>, List<Period>>? periodFilter = null,
+    CancellationToken token = default)
+```
+
+* **workDir:** string, required  
+　Set video download directory.  
+
+* **saveName:** string, required  
+　Set video save name.  
+
+* **url:** string, required  
+　Set m3u8/mpd/http url.  
+
+* **header:** string, optional, default: ""  
+　Set http request header.  
+　format: key1:key1|key2:key2  
+
+* **threads:** int, optional, default: 1  
+　Set the number of threads to download.  
+
+* **delay:** int, optional, default: 200  
+　Set http request delay. (millisecond)  
+
+* **maxRetry:** int, optional, default: 20  
+　Set the maximum number of download retries.  
+
+* **maxSpeed:** long?, optional, default: null  
+　Set the maximum download speed. (byte)  
+　1KB = 1024 byte, 1MB = 1024 * 1024 byte  
+        
+* **interval:** int, optional, default: 1000  
+　Set the progress callback time interval. (millisecond)  
+
+* **checkComplete:** bool, optional, default: true  
+　Set whether to check file count complete.  
+
+* **noSegStopTime:** int?, optional, default: null  
+　Set how long to stop after when there is no segment. (millisecond)  
+
+* **binaryMerge:** bool, optional, default: false  
+　Set use binary merge.  
+
+* **keepFragmented:** bool, optional, default: false  
+　Set keep fragmented mp4.  
+
+* **discardcorrupt:** bool, optional, default: false  
+　Set ffmpeg discard corrupted packets.  
+
+* **genpts:** bool, optional, default: false  
+　Set ffmpeg generate missing PTS if DTS is present.  
+
+* **igndts:** bool, optional, default: false  
+　Set ffmpeg ignore DTS if PTS is set.  
+
+* **ignidx:** bool, optional, default: false  
+　Set ffmpeg ignore index.  
+
+* **outputFormat:** OutputFormat, optional, default: MP4  
+　Set video output format.  
+
+* **clearTempFile:** bool, optional, default: false  
+　Set whether to clear the temporary file after the merge is completed.  
+
+* **clearSource:** bool, optional, default: false  
+　Set whether to clear source file after the muxing is completed.  
+
+* **partFilter:** Func\<List\<Part\>, List\<Part\>\>, optional, default: null  
+　Set m3u8 part filter.  
+
+* **periodFilter:** Func\<List\<Period\>, List\<Period\>\>, optional, default: null  
+　Set mpd period filter.  
+
+* **token:** CancellationToken, optional, default: default  
+　Set cancellation token.  
+
+---  
+
+* **HlsDL.DownloadAsync**  
+
 ```C#
 // Download m3u8 ts files
 public async Task DownloadAsync(
@@ -506,6 +626,8 @@ public async Task DownloadAsync(
 
 ---  
 
+* **HlsDL.MergeAsync**  
+
 ```C#
 // Merge m3u8 ts files
 public async Task MergeAsync(
@@ -561,6 +683,8 @@ public async Task MergeAsync(
 
 ---  
 
+* **HlsDL.REC**  
+
 ```C#
 // REC m3u8 live stream
 public async Task REC(
@@ -613,6 +737,8 @@ public async Task REC(
 　Set cancellation token.  
 
 ---  
+
+* **HlsDL.MuxingAsync**  
 
 ```C#
 // Muxing video source and audio source
