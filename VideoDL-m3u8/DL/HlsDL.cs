@@ -495,7 +495,7 @@ namespace VideoDL_m3u8.DL
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public async Task MergeAsync(string workDir, string saveName,
+        public async Task<string> MergeAsync(string workDir, string saveName,
             OutputFormat outputFormat = OutputFormat.MP4, bool binaryMerge = false,
             bool keepFragmented = false, bool discardcorrupt = false,
             bool genpts = false, bool igndts = false,  bool ignidx = false,
@@ -668,7 +668,7 @@ namespace VideoDL_m3u8.DL
             if (files.Count == 0)
             {
                 clear();
-                return;
+                return "";
             }
 
             if (files.Count == 1)
@@ -683,7 +683,7 @@ namespace VideoDL_m3u8.DL
                             $"{saveName}_{DateTime.Now.ToString("yyyy_MM_dd_HH_mm_ss")}{ext}");
                     File.Move(file, finishPath);
                     clear();
-                    return;
+                    return finishPath;
                 }
             }
 
@@ -747,6 +747,7 @@ namespace VideoDL_m3u8.DL
                 foreach (var file in files)
                     File.Delete(file);
                 clear();
+                return finishPath;
             }
         }
 
@@ -1020,6 +1021,10 @@ namespace VideoDL_m3u8.DL
                 throw new Exception("Parameter workDir cannot be empty.");
             if (string.IsNullOrWhiteSpace(saveName))
                 throw new Exception("Parameter saveName cannot be empty.");
+            if (string.IsNullOrWhiteSpace(videoSourcePath))
+                throw new Exception("Parameter videoSourcePath cannot be empty.");
+            if (string.IsNullOrWhiteSpace(audioSourcePath))
+                throw new Exception("Parameter audioSourcePath cannot be empty.");
 
             // saveName = saveName.FilterFileName();
 

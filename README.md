@@ -58,11 +58,45 @@ var header = "";
 var workDir = @"D:\Temp";
 // video save name
 var saveName = "Video";
+
+var videoDL = new VideoDL();
+// Download m3u8/mpd/http file.
+await videoDL.DownloadAsync(
+    workDir, saveName, url, header, clearTempFile: true);
+```
+---  
+
+### Proxy example  
+
+```C#
+var videoDL = new VideoDL(
+    proxy: "http://127.0.0.1:8000");
+// or
+var videoDL = new VideoDL(
+    proxy: "socks5://127.0.0.1:8000");
+```
+
+---  
+
+### Hls example  
+
+> More detailed operations.  
+
+```C#
+// m3u8 url
+var url = "";
+// http request header
+var header = "";
+// video save directory
+var workDir = @"D:\Temp";
+// video save name
+var saveName = "Video";
 saveName = saveName.FilterFileName();
 
 Console.WriteLine("Start Download...");
 
-var hlsDL = new HlsDL();
+var videoDL = new VideoDL();
+var hlsDL = videoDL.Hls;
 
 // Download m3u8 manifest by url
 var (manifest, m3u8Url) = await hlsDL.GetManifestAsync(url, header);
@@ -124,28 +158,30 @@ Console.ReadLine();
 
 ---  
 
-### Proxy example  
+### REC example  
 
 ```C#
-var hlsDL = new HlsDL(
-    proxy: "http://127.0.0.1:8000");
-// or
-var hlsDL = new HlsDL(
-    proxy: "socks5://127.0.0.1:8000");
-```
+// m3u8 url
+var url = "";
+// http request header
+var header = "";
+// video save directory
+var workDir = @"D:\Temp";
+// video save name
+var saveName = "Live";
+saveName = saveName.FilterFileName();
 
----  
+Console.WriteLine("Start REC...");
 
-### REC Example  
+var videoDL = new VideoDL();
+var hlsDL = videoDL.Hls;
 
-```C#
+// Download m3u8 manifest to media playlist
+var mediaPlaylist = await hlsDL.GetMediaPlaylistAsync(url, header);
+
 // Is a live stream
 if (mediaPlaylist.IsLive())
 {
-    var cts = new CancellationTokenSource();
-    // Check REC stop
-    CheckStop(cts);
-
     try
     {
         await hlsDL.REC(
@@ -156,8 +192,7 @@ if (mediaPlaylist.IsLive())
                 var print = args.Format;
                 var sub = Console.WindowWidth - 2 - print.Length;
                 Console.Write("\r" + print + new string(' ', sub) + "\r");
-            },
-            token: cts.Token);
+            });
     }
     catch { }
 
@@ -181,7 +216,7 @@ if (mediaPlaylist.IsLive())
 
 ---  
 
-### Muxing Example  
+### Muxing example  
 
 ```C#
 // m3u8 url
@@ -198,7 +233,8 @@ var audioSaveName = $"{saveName}(Audio)";
 
 Console.WriteLine("Start Download...");
 
-var hlsDL = new HlsDL();
+var videoDL = new VideoDL();
+var hlsDL = videoDL.Hls;
 
 // Download master manifest by url
 var masterPlaylist = await hlsDL.GetMasterPlaylistAsync(url, header);
@@ -221,13 +257,12 @@ var audioPlaylist = await hlsDL.GetMediaPlaylistAsync(
     audioMediaGroup.Uri, header);
 
 // Download and merge video and audio
-await downloadMerge("video", videoSaveName, videoPlaylist);
-await downloadMerge("audio", audioSaveName, audioPlaylist);
+var videoPath = await downloadMerge("video", videoSaveName, videoPlaylist);
+var audioPath = await downloadMerge("audio", audioSaveName, audioPlaylist);
 
 // Muxing video source and audio source
-await hlsDL.MuxingAsync(workDir, saveName,
-    Path.Combine(workDir, $"{videoSaveName}.ts"),
-    Path.Combine(workDir, $"{audioSaveName}.ts"),
+await hlsDL.MuxingAsync(
+    workDir, saveName, videoPath, audioPath,
     outputFormat: MuxOutputFormat.MP4,
     clearSource: false,
     onMessage: (msg) =>
@@ -239,7 +274,7 @@ await hlsDL.MuxingAsync(workDir, saveName,
 Console.WriteLine("Finish.");
 Console.ReadLine();
 
-async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
+async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
 {
     // Download m3u8 segment key
     var keys = null as Dictionary<string, string>;
@@ -263,7 +298,7 @@ async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist
     Console.WriteLine($"\nStart {id} Merge...");
 
     // Merge m3u8 ts files by FFmpeg
-    await hlsDL.MergeAsync(workDir, saveName,
+    var outputPath = await hlsDL.MergeAsync(workDir, saveName,
         clearTempFile: true, binaryMerge: true,
         outputFormat: OutputFormat.TS,
         onMessage: (msg) =>
@@ -272,12 +307,13 @@ async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist
             Console.Write(msg);
             Console.ResetColor();
         });
+    return outputPath;
 }
 ```
 
 ---  
 
-### MPD Example  
+### MPD example  
 
 ```C#
 // mpd url
@@ -294,7 +330,9 @@ var audioSaveName = $"{saveName}(Audio)";
 
 Console.WriteLine("Start Download...");
 
-var dashDL = new DashDL();
+var videoDL = new VideoDL();
+var dashDL = videoDL.Dash;
+var hlsDL = videoDL.Hls;
 
 // Download mpd manifest by url
 var mpd = await dashDL.GetMpdAsync(url, header);
@@ -311,16 +349,13 @@ if (video == null || audio == null)
 var videoPlaylist = dashDL.ToMediaPlaylist(video);
 var audioPlaylist = dashDL.ToMediaPlaylist(audio);
 
-var hlsDL = new HlsDL();
-
 // Download and merge video and audio
-await downloadMerge("video", videoSaveName, videoPlaylist);
-await downloadMerge("audio", audioSaveName, audioPlaylist);
+var videoPath = await downloadMerge("video", videoSaveName, videoPlaylist);
+var audioPath = await downloadMerge("audio", audioSaveName, audioPlaylist);
 
 // Muxing video source and audio source
-await hlsDL.MuxingAsync(workDir, saveName,
-    Path.Combine(workDir, $"{videoSaveName}.mp4"),
-    Path.Combine(workDir, $"{audioSaveName}.mp4"),
+await hlsDL.MuxingAsync(
+    workDir, saveName, videoPath, audioPath,
     outputFormat: MuxOutputFormat.MP4,
     clearSource: false,
     onMessage: (msg) =>
@@ -332,7 +367,7 @@ await hlsDL.MuxingAsync(workDir, saveName,
     Console.WriteLine("Finish.");
     Console.ReadLine();
 
-async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
+async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
 {
     // Download m3u8 segment key
     var keys = null as Dictionary<string, string>;
@@ -356,7 +391,7 @@ async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist
     Console.WriteLine($"\nStart {id} Merge...");
 
     // Merge mpd mp4 files by FFmpeg
-    await hlsDL.MergeAsync(workDir, saveName,
+    var outputPath = await hlsDL.MergeAsync(workDir, saveName,
         clearTempFile: true, binaryMerge: true,
         outputFormat: OutputFormat.MP4,
         onMessage: (msg) =>
@@ -365,12 +400,13 @@ async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist
             Console.Write(msg);
             Console.ResetColor();
         });
+    return outputPath;
 }
 ```
 
 ---  
 
-### Http Example  
+### Http example  
 
 ```C#
 // video url
@@ -385,7 +421,8 @@ saveName = saveName.FilterFileName();
 
 Console.WriteLine("Start Download...");
 
-var httpDL = new HttpDL();
+var videoDL = new VideoDL();
+var httpDL = videoDL.Http;
 
 // Download video file
 await httpDL.DownloadAsync(workDir, saveName, 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using VideoDL_m3u8;
 using VideoDL_m3u8.DL;
 using VideoDL_m3u8.Enums;
 using VideoDL_m3u8.Extensions;
@@ -23,11 +24,29 @@ namespace Example
             var workDir = @"D:\Temp";
             // video save name
             var saveName = "Video";
+
+            var videoDL = new VideoDL();
+            // Download m3u8/mpd/http file.
+            await videoDL.DownloadAsync(
+                workDir, saveName, url, header, clearTempFile: true);
+        }
+
+        public static async Task Hls(string[] args)
+        {
+            // m3u8 url
+            var url = "";
+            // http request header
+            var header = "";
+            // video save directory
+            var workDir = @"D:\Temp";
+            // video save name
+            var saveName = "Video";
             saveName = saveName.FilterFileName();
 
             Console.WriteLine("Start Download...");
 
-            var hlsDL = new HlsDL();
+            var videoDL = new VideoDL();
+            var hlsDL = videoDL.Hls;
 
             // Download m3u8 manifest by url
             var (manifest, m3u8Url) = await hlsDL.GetManifestAsync(url, header);
@@ -101,7 +120,8 @@ namespace Example
 
             Console.WriteLine("Start REC...");
 
-            var hlsDL = new HlsDL();
+            var videoDL = new VideoDL();
+            var hlsDL = videoDL.Hls;
 
             // Download m3u8 manifest to media playlist
             var mediaPlaylist = await hlsDL.GetMediaPlaylistAsync(url, header);
@@ -162,7 +182,8 @@ namespace Example
 
             Console.WriteLine("Start Download...");
 
-            var hlsDL = new HlsDL();
+            var videoDL = new VideoDL();
+            var hlsDL = videoDL.Hls;
 
             // Download master manifest by url
             var masterPlaylist = await hlsDL.GetMasterPlaylistAsync(url, header);
@@ -185,13 +206,12 @@ namespace Example
                 audioMediaGroup.Uri, header);
 
             // Download and merge video and audio
-            await downloadMerge("video", videoSaveName, videoPlaylist);
-            await downloadMerge("audio", audioSaveName, audioPlaylist);
+            var videoPath = await downloadMerge("video", videoSaveName, videoPlaylist);
+            var audioPath = await downloadMerge("audio", audioSaveName, audioPlaylist);
 
             // Muxing video source and audio source
-            await hlsDL.MuxingAsync(workDir, saveName,
-                Path.Combine(workDir, $"{videoSaveName}.ts"),
-                Path.Combine(workDir, $"{audioSaveName}.ts"),
+            await hlsDL.MuxingAsync(
+                workDir, saveName, videoPath, audioPath,
                 outputFormat: MuxOutputFormat.MP4,
                 clearSource: false,
                 onMessage: (msg) =>
@@ -203,7 +223,7 @@ namespace Example
             Console.WriteLine("Finish.");
             Console.ReadLine();
 
-            async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
+            async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
             {
                 // Download m3u8 segment key
                 var keys = null as Dictionary<string, string>;
@@ -227,7 +247,7 @@ namespace Example
                 Console.WriteLine($"\nStart {id} Merge...");
 
                 // Merge m3u8 ts files by FFmpeg
-                await hlsDL.MergeAsync(workDir, saveName,
+                var outputPath = await hlsDL.MergeAsync(workDir, saveName,
                     clearTempFile: true, binaryMerge: true,
                     outputFormat: OutputFormat.TS,
                     onMessage: (msg) =>
@@ -236,10 +256,11 @@ namespace Example
                         Console.Write(msg);
                         Console.ResetColor();
                     });
+                return outputPath;
             }
         }
 
-        public static async Task Mpd(string[] args)
+        public static async Task Dash(string[] args)
         {
             // mpd url
             var url = "";
@@ -255,7 +276,9 @@ namespace Example
 
             Console.WriteLine("Start Download...");
 
-            var dashDL = new DashDL();
+            var videoDL = new VideoDL();
+            var dashDL = videoDL.Dash;
+            var hlsDL = videoDL.Hls;
 
             // Download mpd manifest by url
             var mpd = await dashDL.GetMpdAsync(url, header);
@@ -271,8 +294,6 @@ namespace Example
             // Parse mpd to m3u8 media playlist
             var videoPlaylist = dashDL.ToMediaPlaylist(video);
             var audioPlaylist = dashDL.ToMediaPlaylist(audio);
-
-            var hlsDL = new HlsDL();
 
             // Download and merge video and audio
             await downloadMerge("video", videoSaveName, videoPlaylist);
@@ -343,7 +364,8 @@ namespace Example
 
             Console.WriteLine("Start Download...");
 
-            var httpDL = new HttpDL();
+            var videoDL = new VideoDL();
+            var httpDL = videoDL.Http;
 
             // Download video file
             await httpDL.DownloadAsync(workDir, saveName, 

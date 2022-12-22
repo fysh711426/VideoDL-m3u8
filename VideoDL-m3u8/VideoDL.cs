@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -252,12 +251,11 @@ namespace VideoDL_m3u8
                     var videoSaveName = $"{saveName}(Video)";
                     var audioSaveName = $"{saveName}(Audio)";
 
-                    await downloadMerge("video", videoSaveName, mediaPlaylist);
-                    await downloadMerge("audio", audioSaveName, audioPlaylist);
+                    var videoPath = await downloadMerge("video", videoSaveName, mediaPlaylist);
+                    var audioPath = await downloadMerge("audio", audioSaveName, audioPlaylist);
 
-                    await hlsDL.MuxingAsync(workDir, saveName,
-                        Path.Combine(workDir, $"{videoSaveName}.mp4"),
-                        Path.Combine(workDir, $"{audioSaveName}.mp4"),
+                    await hlsDL.MuxingAsync(
+                        workDir, saveName, videoPath, audioPath,
                         outputFormat: muxOutputFormat,
                         clearSource: clearSource,
                         onMessage: (msg) =>
@@ -271,7 +269,7 @@ namespace VideoDL_m3u8
                     Console.WriteLine("Finish.");
                     return;
 
-                    async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
+                    async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
                     {
                         var keys = null as Dictionary<string, string>;
                         var segmentKeys = Hls.GetKeys(mediaPlaylist.Parts);
@@ -299,7 +297,7 @@ namespace VideoDL_m3u8
 
                         Console.WriteLine($"\nStart {id} Merge...");
 
-                        await hlsDL.MergeAsync(workDir, saveName,
+                        var outputPath = await hlsDL.MergeAsync(workDir, saveName,
                             clearTempFile: clearTempFile, binaryMerge: true,
                             outputFormat: OutputFormat.MP4,
                             onMessage: (msg) =>
@@ -309,7 +307,7 @@ namespace VideoDL_m3u8
                                 Console.ResetColor();
                             },
                             token: token);
-                        return;
+                        return outputPath;
                     }
                 }
 
