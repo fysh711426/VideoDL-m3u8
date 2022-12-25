@@ -267,7 +267,7 @@ namespace Example
                 var firstSegment = await hlsDL.GetFirstSegmentAsync(
                     workDir, saveName, mediaPlaylist.Parts, header, keys);
 
-                Console.WriteLine("Loading Video Info...");
+                Console.WriteLine($"Loading {id} Info...");
 
                 // Get video info
                 var videoInfos = await FFmpeg.GetVideoInfo(firstSegment);
@@ -370,7 +370,7 @@ namespace Example
                 var firstSegment = await hlsDL.GetFirstSegmentAsync(
                     workDir, saveName, mediaPlaylist.Parts, header, keys);
 
-                Console.WriteLine("Loading Video Info...");
+                Console.WriteLine($"Loading {id} Info...");
 
                 // Get video info
                 var videoInfos = await FFmpeg.GetVideoInfo(firstSegment);
