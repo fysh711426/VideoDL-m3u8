@@ -52,7 +52,7 @@ namespace VideoDL_m3u8.Utils
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new Exception("Parameter filePath cannot be empty.");
             if (!File.Exists(filePath))
-                throw new Exception("Not found filePath.");
+                throw new Exception("Not found file.");
 
             var videoInfo = "";
             var arguments = $@"-i ""{filePath}""";

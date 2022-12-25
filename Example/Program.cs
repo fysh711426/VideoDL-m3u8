@@ -8,6 +8,7 @@ using VideoDL_m3u8;
 using VideoDL_m3u8.Enums;
 using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
+using VideoDL_m3u8.Utils;
 
 namespace Example
 {
@@ -86,6 +87,23 @@ namespace Example
             var segmentKeys = hlsDL.GetKeys(mediaPlaylist.Parts);
             if (segmentKeys.Count > 0)
                 keys = await hlsDL.GetKeysDataAsync(segmentKeys, header);
+
+            // Download first segment
+            var firstSegment = await hlsDL.GetFirstSegmentAsync(
+                workDir, saveName, mediaPlaylist.Parts, header, keys,
+                onSegment: async (ms, token) =>
+                {
+                    // Detect and skip png header
+                    return await ms.TrySkipPngHeaderAsync(token);
+                });
+
+            Console.WriteLine("Loading Video Info...");
+
+            // Get video info
+            var videoInfos = await FFmpeg.GetVideoInfo(firstSegment);
+            videoInfos.ForEach(it => Console.WriteLine(it));
+
+            Console.WriteLine("Waiting...");
 
             // Download m3u8 ts files
             await hlsDL.DownloadAsync(workDir, saveName,
@@ -218,8 +236,8 @@ namespace Example
                 audioMediaGroup.Uri, header);
 
             // Download and merge video and audio
-            var videoPath = await downloadMerge("video", videoSaveName, videoPlaylist);
-            var audioPath = await downloadMerge("audio", audioSaveName, audioPlaylist);
+            var videoPath = await downloadMerge("Video", videoSaveName, videoPlaylist);
+            var audioPath = await downloadMerge("Audio", audioSaveName, audioPlaylist);
 
             // Muxing video source and audio source
             await hlsDL.MuxingAsync(
@@ -237,13 +255,25 @@ namespace Example
 
             async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
             {
+                Console.WriteLine($"Start {id} Download...");
+
                 // Download m3u8 segment key
                 var keys = null as Dictionary<string, string>;
                 var segmentKeys = hlsDL.GetKeys(mediaPlaylist.Parts);
                 if (segmentKeys.Count > 0)
                     keys = await hlsDL.GetKeysDataAsync(segmentKeys, header);
 
-                Console.WriteLine($"Start {id} Download...");
+                // Download first segment
+                var firstSegment = await hlsDL.GetFirstSegmentAsync(
+                    workDir, saveName, mediaPlaylist.Parts, header, keys);
+
+                Console.WriteLine("Loading Video Info...");
+
+                // Get video info
+                var videoInfos = await FFmpeg.GetVideoInfo(firstSegment);
+                videoInfos.ForEach(it => Console.WriteLine(it));
+
+                Console.WriteLine("Waiting...");
 
                 // Download m3u8 ts files
                 await hlsDL.DownloadAsync(workDir, saveName,
@@ -308,8 +338,8 @@ namespace Example
             var audioPlaylist = dashDL.ToMediaPlaylist(audio);
 
             // Download and merge video and audio
-            await downloadMerge("video", videoSaveName, videoPlaylist);
-            await downloadMerge("audio", audioSaveName, audioPlaylist);
+            await downloadMerge("Video", videoSaveName, videoPlaylist);
+            await downloadMerge("Audio", audioSaveName, audioPlaylist);
 
             // Muxing video source and audio source
             await hlsDL.MuxingAsync(workDir, saveName,
@@ -328,13 +358,25 @@ namespace Example
 
             async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
             {
+                Console.WriteLine($"Start {id} Download...");
+
                 // Download m3u8 segment key
                 var keys = null as Dictionary<string, string>;
                 var segmentKeys = hlsDL.GetKeys(mediaPlaylist.Parts);
                 if (segmentKeys.Count > 0)
                     keys = await hlsDL.GetKeysDataAsync(segmentKeys, header);
 
-                Console.WriteLine($"Start {id} Download...");
+                // Download first segment
+                var firstSegment = await hlsDL.GetFirstSegmentAsync(
+                    workDir, saveName, mediaPlaylist.Parts, header, keys);
+
+                Console.WriteLine("Loading Video Info...");
+
+                // Get video info
+                var videoInfos = await FFmpeg.GetVideoInfo(firstSegment);
+                videoInfos.ForEach(it => Console.WriteLine(it));
+
+                Console.WriteLine("Waiting...");
 
                 // Download m3u8 ts files
                 await hlsDL.DownloadAsync(workDir, saveName,

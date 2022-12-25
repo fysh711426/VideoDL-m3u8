@@ -172,7 +172,7 @@ namespace VideoDL_m3u8.DL
         }
 
         /// <summary>
-        /// Get first segment file path.
+        /// Get first segment.
         /// </summary>
         /// <param name="workDir">Set video download directory.</param>
         /// <param name="saveName">Set video save name.</param>
@@ -197,6 +197,8 @@ namespace VideoDL_m3u8.DL
                 onSegment: onSegment, token: token);
 
             var tempDir = Path.Combine(workDir, saveName);
+            if (!Directory.Exists(tempDir))
+                throw new Exception("Not found saveName directory.");
 
             var partDirs = Directory.GetDirectories(tempDir)
                 .Select(it => new
@@ -207,9 +209,6 @@ namespace VideoDL_m3u8.DL
                 .Where(it => it.Name.StartsWith("Part_"))
                 .OrderBy(it => it.Path)
                 .ToList();
-
-            if (partDirs.Count == 0)
-                throw new Exception("Not found parts directory.");
 
             var firstPath = null as string;
 
@@ -301,51 +300,45 @@ namespace VideoDL_m3u8.DL
             var works = new List<(long index, string filePath, string ext,
                 (string Uri, ByteRange? ByteRange, SegmentKey Key) segment)>();
 
-            var findFirst = false;
-            foreach (var part in parts)
+            ((Action)(() => 
             {
-                var count = part.Segments.Count;
-                var partName = $"Part_{part.PartIndex}".PadLeft($"{parts.Count}".Length, '0');
-                var partDir = Path.Combine(tempDir, partName);
-                if (!Directory.Exists(partDir))
-                    Directory.CreateDirectory(partDir);
-
-                var hasMap = false;
-                if (part.SegmentMap != null)
+                foreach (var part in parts)
                 {
-                    var mapName = "!MAP";
-                    var mapPath = Path.Combine(partDir, mapName);
-                    var mapIndex = part.Segments.Count == 0 ?
-                        0 : part.Segments.First().Index;
-                    works.Add((mapIndex, mapPath, ".mp4",
-                        (part.SegmentMap.Uri,
-                         part.SegmentMap.ByteRange,
-                         part.SegmentMap.Key)));
-                    hasMap = true;
-                    findFirst = true;
+                    var count = part.Segments.Count;
+                    var partName = $"Part_{part.PartIndex}".PadLeft($"{parts.Count}".Length, '0');
+                    var partDir = Path.Combine(tempDir, partName);
+                    if (!Directory.Exists(partDir))
+                        Directory.CreateDirectory(partDir);
+
+                    var hasMap = false;
+                    if (part.SegmentMap != null)
+                    {
+                        var mapName = "!MAP";
+                        var mapPath = Path.Combine(partDir, mapName);
+                        var mapIndex = part.Segments.Count == 0 ?
+                            0 : part.Segments.First().Index;
+                        works.Add((mapIndex, mapPath, ".mp4",
+                            (part.SegmentMap.Uri,
+                             part.SegmentMap.ByteRange,
+                             part.SegmentMap.Key)));
+                        hasMap = true;
+                        if (onlyFirstSegment)
+                            return;
+                    }
+
+                    foreach (var item in part.Segments)
+                    {
+                        var ext = hasMap ? ".m4s" : ".ts";
+                        var fileName = $"{item.Index}".PadLeft($"{count}".Length, '0');
+                        var filePath = Path.Combine(partDir, $"{fileName}");
+                        works.Add((item.Index, filePath, ext,
+                            (item.Uri, item.ByteRange, item.Key)));
+                        if (onlyFirstSegment)
+                            return;
+                    }
                 }
-
-                if (onlyFirstSegment)
-                    if (findFirst)
-                        break;
-
-                foreach (var item in part.Segments)
-                {
-                    var ext = hasMap ? ".m4s" : ".ts";
-                    var fileName = $"{item.Index}".PadLeft($"{count}".Length, '0');
-                    var filePath = Path.Combine(partDir, $"{fileName}");
-                    works.Add((item.Index, filePath, ext,
-                        (item.Uri, item.ByteRange, item.Key)));
-                    findFirst = true;
-                    if (onlyFirstSegment)
-                        break;
-                }
-
-                if (onlyFirstSegment)
-                    if (findFirst)
-                        break;
-            }
-
+            }))();
+            
             var retry = 0;
             var total = 0;
             var finish = 0;
