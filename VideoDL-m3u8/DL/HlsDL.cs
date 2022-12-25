@@ -171,58 +171,75 @@ namespace VideoDL_m3u8.DL
             return Convert.ToBase64String(data);
         }
 
+        /// <summary>
+        /// Get first segment file path.
+        /// </summary>
+        /// <param name="workDir">Set video download directory.</param>
+        /// <param name="saveName">Set video save name.</param>
+        /// <param name="parts">Set m3u8 media playlist parts to download.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="keys">Set m3u8 segment keys.</param>
+        /// <param name="onSegment">Set segment download callback.</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public async Task<string> GetFirstSegmentAsync(
             string workDir, string saveName,
             List<Part> parts, string header = "",
-            Dictionary<string, string>? keys = null)
+            Dictionary<string, string>? keys = null,
+            Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
+            CancellationToken token = default)
         {
-            if (string.IsNullOrWhiteSpace(workDir))
-                throw new Exception("Parameter workDir cannot be empty.");
-            if (string.IsNullOrWhiteSpace(saveName))
-                throw new Exception("Parameter saveName cannot be empty.");
-
-            if (parts == null ||
-                parts.Count == 0 || !parts.SelectMany(it => it.Segments).Any())
-                throw new Exception("Parameter parts cannot be empty.");
-
-            keys = keys ?? new Dictionary<string, string>();
+            await DownloadAsync(
+                workDir, saveName, parts, header, keys,
+                threads: 1, maxRetry: 0, onlyFirstSegment: true,
+                onSegment: onSegment, token: token);
 
             var tempDir = Path.Combine(workDir, saveName);
 
-            var works = new List<(long index, string filePath, string ext,
-                (string Uri, ByteRange? ByteRange, SegmentKey Key) segment)>();
+            var partDirs = Directory.GetDirectories(tempDir)
+                .Select(it => new
+                {
+                    Path = it,
+                    Name = Path.GetFileName(it)
+                })
+                .Where(it => it.Name.StartsWith("Part_"))
+                .OrderBy(it => it.Path)
+                .ToList();
 
-            foreach (var part in parts)
+            if (partDirs.Count == 0)
+                throw new Exception("Not found parts directory.");
+
+            var firstPath = null as string;
+
+            foreach (var partDir in partDirs)
             {
-                var count = part.Segments.Count;
-                var partName = $"Part_{part.PartIndex}".PadLeft($"{parts.Count}".Length, '0');
-                var partDir = Path.Combine(tempDir, partName);
-                if (!Directory.Exists(partDir))
-                    Directory.CreateDirectory(partDir);
+                var partFiles = Directory.GetFiles(partDir.Path)
+                    .Where(it =>
+                        it.EndsWith(".mp4") ||
+                        it.EndsWith(".m4s") ||
+                        it.EndsWith(".ts"))
+                    .Select(it => new
+                    {
+                        item = it,
+                        index = Path.GetFileNameWithoutExtension(it)
+                            .PadLeft(25, '0')
+                    })
+                    .OrderBy(it => it.index)
+                    .Select(it => it.item)
+                    .ToList();
 
-                var hasMap = false;
-                if (part.SegmentMap != null)
+                if (partFiles.Count > 0)
                 {
-                    var mapName = "!MAP";
-                    var mapPath = Path.Combine(partDir, mapName);
-                    var mapIndex = part.Segments.Count == 0 ?
-                        0 : part.Segments.First().Index;
-                    works.Add((mapIndex, mapPath, ".mp4",
-                        (part.SegmentMap.Uri,
-                         part.SegmentMap.ByteRange,
-                         part.SegmentMap.Key)));
-                    hasMap = true;
-                }
-
-                foreach (var item in part.Segments)
-                {
-                    var ext = hasMap ? ".m4s" : ".ts";
-                    var fileName = $"{item.Index}".PadLeft($"{count}".Length, '0');
-                    var filePath = Path.Combine(partDir, $"{fileName}");
-                    works.Add((item.Index, filePath, ext,
-                        (item.Uri, item.ByteRange, item.Key)));
+                    firstPath = partFiles.First();
+                    break;
                 }
             }
+            
+            if (firstPath == null || !File.Exists(firstPath))
+                throw new Exception("Not found first segment.");
+            return firstPath;
         }
 
         /// <summary>
@@ -241,8 +258,8 @@ namespace VideoDL_m3u8.DL
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
         /// <param name="checkComplete">Set whether to check file count complete.</param>
+        /// <param name="onlyFirstSegment">Set only download the first segment.</param>
         /// <param name="onSegment">Set segment download callback.</param>
-        /// <param name="onFirst">Set first segment download callback.</param>
         /// <param name="progress">Set progress callback.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
@@ -252,9 +269,9 @@ namespace VideoDL_m3u8.DL
             List<Part> parts, string header = "",
             Dictionary<string, string>? keys = null,
             int threads = 1, int delay = 200, int maxRetry = 20,
-            long? maxSpeed = null, int interval = 1000, bool checkComplete = true,
+            long? maxSpeed = null, int interval = 1000, 
+            bool checkComplete = true, bool onlyFirstSegment = false,
             Func<Stream, CancellationToken, Task<Stream>>? onSegment = null,
-            Func<string, Task>? onFirst = null,
             Action<ProgressEventArgs>? progress = null,
             CancellationToken token = default)
         {
@@ -284,6 +301,7 @@ namespace VideoDL_m3u8.DL
             var works = new List<(long index, string filePath, string ext,
                 (string Uri, ByteRange? ByteRange, SegmentKey Key) segment)>();
 
+            var findFirst = false;
             foreach (var part in parts)
             {
                 var count = part.Segments.Count;
@@ -304,7 +322,12 @@ namespace VideoDL_m3u8.DL
                          part.SegmentMap.ByteRange,
                          part.SegmentMap.Key)));
                     hasMap = true;
+                    findFirst = true;
                 }
+
+                if (onlyFirstSegment)
+                    if (findFirst)
+                        break;
 
                 foreach (var item in part.Segments)
                 {
@@ -313,7 +336,14 @@ namespace VideoDL_m3u8.DL
                     var filePath = Path.Combine(partDir, $"{fileName}");
                     works.Add((item.Index, filePath, ext,
                         (item.Uri, item.ByteRange, item.Key)));
+                    findFirst = true;
+                    if (onlyFirstSegment)
+                        break;
                 }
+
+                if (onlyFirstSegment)
+                    if (findFirst)
+                        break;
             }
 
             var retry = 0;
@@ -321,7 +351,6 @@ namespace VideoDL_m3u8.DL
             var finish = 0;
             var downloadBytes = 0L;
             var intervalDownloadBytes = 0L;
-            var isFirst = false;
             total = works.Count;
 
             async Task<long> copyToAsync(Stream s, Stream d,
@@ -375,22 +404,7 @@ namespace VideoDL_m3u8.DL
                         })
                         .ToList();
 
-                    if (!isFirst && onFirst != null)
-                    {
-                        var first = works.First();
-                        if (finish == 0)
-                            await download(first, token);
-                        await onFirst($"{first.filePath}{first.ext}");
-                        isFirst = true;
-                    }
-
-                    await ParallelTask.Run(todoWorks, async (it, _token) =>
-                    {
-                        await download(it, _token);
-                    }, threads, delay, token);
-                
-                    async Task download((long index, string filePath, string ext,
-                        (string Uri, ByteRange? ByteRange, SegmentKey Key) segment) item, CancellationToken token)
+                    await ParallelTask.Run(todoWorks, async (item, _token) =>
                     {
                         var index = item.index;
                         var filePath = item.filePath;
@@ -416,7 +430,7 @@ namespace VideoDL_m3u8.DL
                                     async Task<Stream> download()
                                     {
                                         var ms = new MemoryStream();
-                                        var size = await copyToAsync(stream, ms, token);
+                                        var size = await copyToAsync(stream, ms, _token);
                                         if (contentLength != null)
                                         {
                                             if (size != contentLength)
@@ -438,15 +452,15 @@ namespace VideoDL_m3u8.DL
                                         {
                                             var decryptStream = new MemoryStream();
                                             await new Cryptor().AES128Decrypt(
-                                                ms, key, iv, decryptStream, token);
+                                                ms, key, iv, decryptStream, _token);
                                             decryptStream.Position = 0;
-                                            ms = await onSegment(decryptStream, token);
-                                            await ms.CopyToAsync(fs, 4096, token);
+                                            ms = await onSegment(decryptStream, _token);
+                                            await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                         else
                                         {
                                             await new Cryptor().AES128Decrypt(
-                                                ms, key, iv, fs, token);
+                                                ms, key, iv, fs, _token);
                                         }
                                     }
                                     else
@@ -454,20 +468,19 @@ namespace VideoDL_m3u8.DL
                                         var ms = await download();
                                         if (onSegment != null)
                                         {
-                                            ms = await onSegment(ms, token);
-                                            await ms.CopyToAsync(fs, 4096, token);
+                                            ms = await onSegment(ms, _token);
+                                            await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                         else
                                         {
-                                            await ms.CopyToAsync(fs, 4096, token);
+                                            await ms.CopyToAsync(fs, 4096, _token);
                                         }
                                     }
                                 }
                                 File.Move(tempPath, savePath);
-                            }, rangeFrom, rangeTo, token);
+                            }, rangeFrom, rangeTo, _token);
                         finish++;
-                    }
-
+                    }, threads, delay, token);
                 }, 10 * 1000, maxRetry, token);
             }
 
@@ -535,7 +548,7 @@ namespace VideoDL_m3u8.DL
             {
                 timer.Enabled = true;
                 await func();
-                if (checkComplete)
+                if (checkComplete && !onlyFirstSegment)
                     checkFilesComplete();
                 stop = true;
                 timer.Enabled = false;

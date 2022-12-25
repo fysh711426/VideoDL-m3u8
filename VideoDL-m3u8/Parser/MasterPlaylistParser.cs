@@ -7,7 +7,7 @@ namespace VideoDL_m3u8.Parser
 {
     internal class MasterPlaylistParser: BaseParser
     {
-        // Regex referenced at:
+        // Regex refer to:
         // https://github.com/videojs/m3u8-parser
         public MasterPlaylist Parse(string manifest, string m3u8Url = "")
         {
