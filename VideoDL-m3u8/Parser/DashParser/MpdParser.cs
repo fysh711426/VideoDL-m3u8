@@ -28,8 +28,9 @@ namespace VideoDL_m3u8.DashParser
                 MediaPresentationDuration = mediaPresentationDuration != "" ?
                     mediaPresentationDuration.ParseTimeSpan() : null
             };
-            mpd = GenerateSegmentTemplate(mpd);
-            mpd = GenerateSegmentUrl(mpd, mpdUrl);
+
+            mpd = ExpandSegmentTemplate(mpd);
+            mpd = ExpandSegmentUrl(mpd, mpdUrl);
             return mpd;
         }
 
@@ -265,7 +266,7 @@ namespace VideoDL_m3u8.DashParser
             };
         }
 
-        protected Mpd GenerateSegmentUrl(Mpd mpd, string mpdUrl)
+        protected Mpd ExpandSegmentUrl(Mpd mpd, string mpdUrl)
         {
             var baseUrl = mpdUrl;
             if (!string.IsNullOrEmpty(mpd.BaseUrl))
@@ -325,7 +326,7 @@ namespace VideoDL_m3u8.DashParser
             return mpd;
         }
 
-        protected Mpd GenerateSegmentTemplate(Mpd mpd)
+        protected Mpd ExpandSegmentTemplate(Mpd mpd)
         {
             foreach (var period in mpd.Periods)
             {
@@ -401,14 +402,6 @@ namespace VideoDL_m3u8.DashParser
                                     segmentList.SegmentUrls.Add(segmentUrl);
                                 }
                             }
-                            continue;
-                        }
-
-                        var segmentBase = representation.SegmentBase;
-                        if (segmentBase != null)
-                        {
-                            var segmentUrl = new SegmentUrl();
-                            segmentList.SegmentUrls.Add(segmentUrl);
                         }
                     }
                 }

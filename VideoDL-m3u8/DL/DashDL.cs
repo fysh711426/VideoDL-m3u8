@@ -1,8 +1,10 @@
-﻿using System.Net.Http;
+﻿using System;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8.DashParser;
+using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
 
 namespace VideoDL_m3u8.DL
@@ -71,6 +73,61 @@ namespace VideoDL_m3u8.DL
         {
             var parser = new MpdParser();
             return parser.Parse(manifest, url);
+        }
+
+        /// <summary>
+        /// Expand segmentBase to segmentList.
+        /// </summary>
+        /// <param name="mpd">Set mpd.</param>
+        /// <param name="url">Set mpd url.</param>
+        /// <param name="header">Set http request header.
+        /// format: key1:key1|key2:key2</param>
+        /// <param name="token">Set cancellation token.</param>
+        /// <returns></returns>
+        public async Task ExpandSegmentBase(Mpd mpd, 
+            string url = "", string header = "", CancellationToken token = default)
+        {
+            var baseUrl = url;
+            if (!string.IsNullOrEmpty(mpd.BaseUrl))
+                baseUrl = string.IsNullOrEmpty(baseUrl) ?
+                    mpd.BaseUrl : baseUrl.CombineUri(mpd.BaseUrl);
+
+            foreach (var period in mpd.Periods)
+            {
+                foreach (var adaptationSet in period.AdaptationSets)
+                {
+                    var adaBaseUrl = baseUrl;
+                    if (!string.IsNullOrEmpty(adaptationSet.BaseUrl))
+                        adaBaseUrl = string.IsNullOrEmpty(adaBaseUrl) ?
+                            adaptationSet.BaseUrl : adaBaseUrl.CombineUri(adaptationSet.BaseUrl);
+
+                    foreach (var representation in adaptationSet.Representations)
+                    {
+                        var repBaseUrl = adaBaseUrl;
+                        if (!string.IsNullOrEmpty(representation.BaseUrl))
+                            repBaseUrl = string.IsNullOrEmpty(repBaseUrl) ?
+                                representation.BaseUrl : repBaseUrl.CombineUri(representation.BaseUrl);
+
+                        var segmentList = representation.SegmentList;
+                        var segmentBase = representation.SegmentBase;
+                        if (segmentBase != null)
+                        {
+                            var sidxUrl = repBaseUrl;
+                            var rangeFrom = segmentBase.IndexRange?.From;
+                            var rangeTo = segmentBase.IndexRange?.To;
+
+                            if (rangeFrom == null || rangeTo == null)
+                                throw new Exception("Not found SegmentBase IndexRange.");
+
+                            var (data, _) = await GetBytesAsync(_httpClient,
+                                sidxUrl, header, rangeFrom, rangeTo, token);
+
+                            var parser = new SidxParser();
+                            var sidx = parser.Parse(data);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
