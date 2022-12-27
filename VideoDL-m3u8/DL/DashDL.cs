@@ -1,10 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDL_m3u8.DashParser;
-using VideoDL_m3u8.Extensions;
 using VideoDL_m3u8.Parser;
 
 namespace VideoDL_m3u8.DL
@@ -78,54 +78,78 @@ namespace VideoDL_m3u8.DL
         /// <summary>
         /// Expand segmentBase to segmentList.
         /// </summary>
-        /// <param name="mpd">Set mpd.</param>
-        /// <param name="url">Set mpd url.</param>
+        /// <param name="representation">Set representation.</param>
         /// <param name="header">Set http request header.
         /// format: key1:key1|key2:key2</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
-        public async Task ExpandSegmentBase(Mpd mpd, 
-            string url = "", string header = "", CancellationToken token = default)
+        public async Task ExpandSegmentBase(Representation representation,
+            string header = "", CancellationToken token = default)
         {
-            var baseUrl = url;
-            if (!string.IsNullOrEmpty(mpd.BaseUrl))
-                baseUrl = string.IsNullOrEmpty(baseUrl) ?
-                    mpd.BaseUrl : baseUrl.CombineUri(mpd.BaseUrl);
-
-            foreach (var period in mpd.Periods)
+            var segmentList = representation.SegmentList;
+            var segmentBase = representation.SegmentBase;
+            if (segmentBase != null)
             {
-                foreach (var adaptationSet in period.AdaptationSets)
+                if (string.IsNullOrEmpty(segmentBase.BaseUrl))
+                    throw new Exception("Not found segmentBase baseUrl.");
+
+                var initialization = segmentBase.Initialization;
+                var rangeFrom = initialization?.Range?.From;
+                var rangeTo = initialization?.Range?.To;
+
+                if (rangeFrom == null || rangeTo == null)
+                    throw new Exception("Not found segmentBase initialization range.");
+
+                var (respHeaders, _) = await GetHeadersAsync(_httpClient,
+                    segmentBase.BaseUrl, header, 0, 0, token);
+
+                var contentLength = respHeaders?.ContentRange?.Length;
+                if (contentLength == null)
+                    throw new Exception("Not found segmentBase content-length.");
+
+                segmentList.Initialization = new Initialization
                 {
-                    var adaBaseUrl = baseUrl;
-                    if (!string.IsNullOrEmpty(adaptationSet.BaseUrl))
-                        adaBaseUrl = string.IsNullOrEmpty(adaBaseUrl) ?
-                            adaptationSet.BaseUrl : adaBaseUrl.CombineUri(adaptationSet.BaseUrl);
-
-                    foreach (var representation in adaptationSet.Representations)
+                    SourceURL = segmentBase.BaseUrl,
+                    Range = new IndexRange
                     {
-                        var repBaseUrl = adaBaseUrl;
-                        if (!string.IsNullOrEmpty(representation.BaseUrl))
-                            repBaseUrl = string.IsNullOrEmpty(repBaseUrl) ?
-                                representation.BaseUrl : repBaseUrl.CombineUri(representation.BaseUrl);
-
-                        var segmentList = representation.SegmentList;
-                        var segmentBase = representation.SegmentBase;
-                        if (segmentBase != null)
-                        {
-                            var sidxUrl = repBaseUrl;
-                            var rangeFrom = segmentBase.IndexRange?.From;
-                            var rangeTo = segmentBase.IndexRange?.To;
-
-                            if (rangeFrom == null || rangeTo == null)
-                                throw new Exception("Not found SegmentBase IndexRange.");
-
-                            var (data, _) = await GetBytesAsync(_httpClient,
-                                sidxUrl, header, rangeFrom, rangeTo, token);
-
-                            var parser = new SidxParser();
-                            var sidx = parser.Parse(data);
-                        }
+                        From = rangeFrom.Value,
+                        To = rangeTo.Value,
                     }
+                };
+
+                var chunkSize = 4 * 1024 * 1024;
+
+                List<(long from, long to)> calcChunks()
+                {
+                    var ranges = new List<(long from, long to)>();
+
+                    var current = rangeTo.Value + 1;
+                    var length = contentLength.Value - current;
+
+                    while (true)
+                    {
+                        var size = Math.Min(length, chunkSize);
+                        if (size == 0)
+                            break;
+                        ranges.Add((current, current + size - 1));
+                        current += size;
+                        length -= size;
+                    }
+                    return ranges;
+                }
+                var chunks = calcChunks();
+
+                foreach (var chunk in chunks)
+                {
+                    segmentList.SegmentUrls.Add(new SegmentUrl
+                    {
+                        Media = segmentBase.BaseUrl,
+                        MediaRange = new IndexRange
+                        {
+                            From = chunk.from,
+                            To = chunk.to,
+                        }
+                    });
                 }
             }
         }

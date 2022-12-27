@@ -53,7 +53,7 @@ namespace VideoDL_m3u8.DashParser
                     var SAP_DeltaTime = bytes & 0x0fffffff;
                 }
             }
-            return null;
+            return new Sidx();
         }
     }
 }

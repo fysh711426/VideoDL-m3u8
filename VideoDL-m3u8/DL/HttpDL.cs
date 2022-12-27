@@ -189,7 +189,6 @@ namespace VideoDL_m3u8.DL
                     }
                     return ranges;
                 }
-
                 var chunks = calcChunks();
 
                 var index = 0;

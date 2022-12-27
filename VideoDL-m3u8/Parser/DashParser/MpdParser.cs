@@ -171,7 +171,7 @@ namespace VideoDL_m3u8.DashParser
             {
                 SourceURL = sourceURL,
                 Range = range != "" ?
-                    new Range
+                    new IndexRange
                     {
                         From = long.Parse(range.Split('-')[0]),
                         To = long.Parse(range.Split('-')[1])
@@ -190,13 +190,13 @@ namespace VideoDL_m3u8.DashParser
                 Media = media,
                 Index = index,
                 MediaRange = mediaRange != "" ?
-                    new Range
+                    new IndexRange
                     {
                         From = long.Parse(mediaRange.Split('-')[0]),
                         To = long.Parse(mediaRange.Split('-')[1])
                     } : null,
                 IndexRange = indexRange != "" ?
-                    new Range
+                    new IndexRange
                     {
                         From = long.Parse(indexRange.Split('-')[0]),
                         To = long.Parse(indexRange.Split('-')[1])
@@ -258,7 +258,7 @@ namespace VideoDL_m3u8.DashParser
                 Initialization = initialization != null ?
                    GetInitialization((XmlElement)initialization) : null,
                 IndexRange = indexRange != "" ?
-                    new Range
+                    new IndexRange
                     {
                         From = long.Parse(indexRange.Split('-')[0]),
                         To = long.Parse(indexRange.Split('-')[1])
@@ -270,8 +270,11 @@ namespace VideoDL_m3u8.DashParser
         {
             var baseUrl = mpdUrl;
             if (!string.IsNullOrEmpty(mpd.BaseUrl))
+            {
                 baseUrl = string.IsNullOrEmpty(baseUrl) ?
                     mpd.BaseUrl : baseUrl.CombineUri(mpd.BaseUrl);
+                mpd.BaseUrl = baseUrl;
+            }
 
             foreach (var period in mpd.Periods)
             {
@@ -279,16 +282,48 @@ namespace VideoDL_m3u8.DashParser
                 {
                     var adaBaseUrl = baseUrl;
                     if (!string.IsNullOrEmpty(adaptationSet.BaseUrl))
+                    {
                         adaBaseUrl = string.IsNullOrEmpty(adaBaseUrl) ?
                             adaptationSet.BaseUrl : adaBaseUrl.CombineUri(adaptationSet.BaseUrl);
+                        adaptationSet.BaseUrl = adaBaseUrl;
+                    }
 
                     foreach (var representation in adaptationSet.Representations)
                     {
                         var repBaseUrl = adaBaseUrl;
                         if (!string.IsNullOrEmpty(representation.BaseUrl))
+                        {
                             repBaseUrl = string.IsNullOrEmpty(repBaseUrl) ?
                                 representation.BaseUrl : repBaseUrl.CombineUri(representation.BaseUrl);
-                        
+                            representation.BaseUrl = repBaseUrl;
+                        }
+
+                        var segmentTemplate = representation.SegmentTemplate;
+                        if (segmentTemplate != null)
+                        {
+                            var initUrl = repBaseUrl;
+                            if (!string.IsNullOrEmpty(segmentTemplate.Initialization))
+                            {
+                                initUrl = string.IsNullOrEmpty(initUrl) ?
+                                    segmentTemplate.Initialization : initUrl.CombineUri(segmentTemplate.Initialization);
+                                segmentTemplate.Initialization = initUrl;
+                            }
+                            var mediaUrl = repBaseUrl;
+                            if (!string.IsNullOrEmpty(segmentTemplate.Media))
+                            {
+                                mediaUrl = string.IsNullOrEmpty(mediaUrl) ?
+                                    segmentTemplate.Media : mediaUrl.CombineUri(segmentTemplate.Media);
+                                segmentTemplate.Media = mediaUrl;
+                            }
+                        }
+
+                        var segmentBase = representation.SegmentBase;
+                        if (segmentBase != null)
+                        {
+                            if (repBaseUrl != mpdUrl)
+                                segmentBase.BaseUrl = repBaseUrl;
+                        }
+
                         var segmentList = representation.SegmentList;
                         if (segmentList.Initialization != null)
                         {
@@ -314,8 +349,7 @@ namespace VideoDL_m3u8.DashParser
                                     segmentUrl.Index : indexUrl.CombineUri(segmentUrl.Index);
                                 segmentUrl.Index = indexUrl;
                             }
-                            if (string.IsNullOrEmpty(segmentUrl.Index) &&
-                                segmentUrl.IndexRange != null)
+                            else if (segmentUrl.IndexRange != null)
                             {
                                 segmentUrl.Index = indexUrl;
                             }

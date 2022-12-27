@@ -58,20 +58,20 @@ namespace VideoDL_m3u8.DashParser
     public class Initialization
     {
         public string SourceURL { get; set; } = "";
-        public Range? Range { get; set; }
+        public IndexRange? Range { get; set; }
     }
 
     public class SegmentUrl
     {
         public string Media { get; set; } = "";
         public string Index { get; set; } = "";
-        public Range? MediaRange { get; set; }
-        public Range? IndexRange { get; set; }
+        public IndexRange? MediaRange { get; set; }
+        public IndexRange? IndexRange { get; set; }
         public int Timescale { get; set; }
         public int Duration { get; set; }
     }
 
-    public class Range
+    public class IndexRange
     {
         public long From { get; set; }
         public long To { get; set; }
@@ -96,7 +96,8 @@ namespace VideoDL_m3u8.DashParser
 
     public class SegmentBase
     {
+        public string BaseUrl { get; set; } = "";
         public Initialization? Initialization { get; set; }
-        public Range? IndexRange { get; set; }
+        public IndexRange? IndexRange { get; set; }
     }
 }
