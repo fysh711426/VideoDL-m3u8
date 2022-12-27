@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -323,7 +322,10 @@ namespace Example
             var hlsDL = videoDL.Hls;
 
             // Download mpd manifest by url
-            var mpd = await dashDL.GetMpdAsync(url, header);
+            var (manifest, mpdUrl) = await dashDL.GetManifestAsync(url, header);
+
+            // Parse manifest to mpd
+            var mpd = dashDL.ParseMpd(manifest, mpdUrl);
 
             // Select mpd first period
             var period = mpd.Periods.First();
@@ -333,18 +335,21 @@ namespace Example
             if (video == null || audio == null)
                 throw new Exception("Not found video or audio.");
 
+            // Expand segmentBase to segmentList
+            await dashDL.ExpandSegmentBase(video, header);
+            await dashDL.ExpandSegmentBase(audio, header);
+
             // Parse mpd to m3u8 media playlist
             var videoPlaylist = dashDL.ToMediaPlaylist(video);
             var audioPlaylist = dashDL.ToMediaPlaylist(audio);
 
             // Download and merge video and audio
-            await downloadMerge("Video", videoSaveName, videoPlaylist);
-            await downloadMerge("Audio", audioSaveName, audioPlaylist);
+            var videoPath = await downloadMerge("Video", videoSaveName, videoPlaylist);
+            var audioPath = await downloadMerge("Audio", audioSaveName, audioPlaylist);
 
             // Muxing video source and audio source
-            await hlsDL.MuxingAsync(workDir, saveName,
-                Path.Combine(workDir, $"{videoSaveName}.mp4"),
-                Path.Combine(workDir, $"{audioSaveName}.mp4"),
+            await hlsDL.MuxingAsync(
+                workDir, saveName, videoPath, audioPath,
                 outputFormat: MuxOutputFormat.MP4,
                 clearSource: true,
                 onMessage: (msg) =>
@@ -356,7 +361,7 @@ namespace Example
             Console.WriteLine("Finish.");
             Console.ReadLine();
 
-            async Task downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
+            async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
             {
                 Console.WriteLine($"Start {id} Download...");
 
@@ -392,7 +397,7 @@ namespace Example
                 Console.WriteLine($"\nStart {id} Merge...");
 
                 // Merge mpd mp4 files by FFmpeg
-                await hlsDL.MergeAsync(workDir, saveName,
+                var outputPath = await hlsDL.MergeAsync(workDir, saveName,
                     clearTempFile: true, binaryMerge: true,
                     outputFormat: OutputFormat.MP4,
                     onMessage: (msg) =>
@@ -401,6 +406,7 @@ namespace Example
                         Console.Write(msg);
                         Console.ResetColor();
                     });
+                return outputPath;
             }
         }
 

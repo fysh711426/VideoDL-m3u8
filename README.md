@@ -379,7 +379,10 @@ var dashDL = videoDL.Dash;
 var hlsDL = videoDL.Hls;
 
 // Download mpd manifest by url
-var mpd = await dashDL.GetMpdAsync(url, header);
+var (manifest, mpdUrl) = await dashDL.GetManifestAsync(url, header);
+
+// Parse manifest to mpd
+var mpd = dashDL.ParseMpd(manifest, mpdUrl);
 
 // Select mpd first period
 var period = mpd.Periods.First();
@@ -388,6 +391,10 @@ var audio = period.GetWithHighestQualityAudio();
 
 if (video == null || audio == null)
     throw new Exception("Not found video or audio.");
+
+// Expand segmentBase to segmentList
+await dashDL.ExpandSegmentBase(video, header);
+await dashDL.ExpandSegmentBase(audio, header);
 
 // Parse mpd to m3u8 media playlist
 var videoPlaylist = dashDL.ToMediaPlaylist(video);
