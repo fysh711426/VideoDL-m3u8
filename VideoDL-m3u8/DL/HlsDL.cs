@@ -691,16 +691,16 @@ namespace VideoDL_m3u8.DL
                     switch (outputFormat)
                     {
                         case OutputFormat.MP4:
-                            arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc {partOutputPath}.mp4";
+                            arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y -bsf:a aac_adtstoasc ""{partOutputPath}.mp4""";
                             break;
                         case OutputFormat.TS:
-                            arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb {partOutputPath}.ts";
+                            arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb ""{partOutputPath}.ts""";
                             break;
                         case OutputFormat.M4A:
-                            arguments += $@"-map 0:a -c copy -y {partOutputPath}.m4a";
+                            arguments += $@"-map 0:a -c copy -y ""{partOutputPath}.m4a""";
                             break;
                         case OutputFormat.SRT:
-                            arguments += $@"-map 0 -y {partOutputPath}.srt";
+                            arguments += $@"-map 0 -y ""{partOutputPath}.srt""";
                             break;
                         default:
                             throw new Exception("OutputFormat not match.");
@@ -794,16 +794,16 @@ namespace VideoDL_m3u8.DL
                 {
                     case OutputFormat.MP4:
                         var aacFilter = files.Any(it => it.EndsWith(".ts")) ? "-bsf:a aac_adtstoasc" : "";
-                        arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y {aacFilter} {outputPath}.mp4";
+                        arguments += $@"-map 0:v? -map 0:a? -map 0:s? -c copy -y {aacFilter} ""{outputPath}.mp4""";
                         break;
                     case OutputFormat.TS:
-                        arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb {outputPath}.ts";
+                        arguments += $@"-map 0 -c copy -y -f mpegts -bsf:v h264_mp4toannexb ""{outputPath}.ts""";
                         break;
                     case OutputFormat.M4A:
-                        arguments += $@"-map 0:a -c copy -y {outputPath}.m4a";
+                        arguments += $@"-map 0:a -c copy -y ""{outputPath}.m4a""";
                         break;
                     case OutputFormat.SRT:
-                        arguments += $@"-map 0 -y {outputPath}.srt";
+                        arguments += $@"-map 0 -y ""{outputPath}.srt""";
                         break;
                     default:
                         throw new Exception("OutputFormat not match.");

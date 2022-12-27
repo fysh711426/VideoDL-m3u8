@@ -198,15 +198,20 @@ namespace VideoDL_m3u8
 
                     if (video != null && audio != null)
                     {
+                        await dashDL.ExpandSegmentBase(video, header);
                         mediaPlaylist = dashDL.ToMediaPlaylist(video);
+
+                        await dashDL.ExpandSegmentBase(audio, header);
                         audioPlaylist = dashDL.ToMediaPlaylist(audio);
                     }
                     else if (video != null)
                     {
+                        await dashDL.ExpandSegmentBase(video, header);
                         mediaPlaylist = dashDL.ToMediaPlaylist(video);
                     }
                     else if (audio != null)
                     {
+                        await dashDL.ExpandSegmentBase(audio, header);
                         mediaPlaylist = dashDL.ToMediaPlaylist(audio);
                     }
                 }
@@ -694,15 +699,20 @@ namespace VideoDL_m3u8
 
             if (video != null && audio != null)
             {
+                await dashDL.ExpandSegmentBase(video, header);
                 mediaPlaylist = dashDL.ToMediaPlaylist(video);
+
+                await dashDL.ExpandSegmentBase(audio, header);
                 audioPlaylist = dashDL.ToMediaPlaylist(audio);
             }
             else if (video != null)
             {
+                await dashDL.ExpandSegmentBase(video, header);
                 mediaPlaylist = dashDL.ToMediaPlaylist(video);
             }
             else if (audio != null)
             {
+                await dashDL.ExpandSegmentBase(audio, header);
                 mediaPlaylist = dashDL.ToMediaPlaylist(audio);
             }
 

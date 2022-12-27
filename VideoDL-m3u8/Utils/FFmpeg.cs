@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ namespace VideoDL_m3u8.Utils
             {
                 UseShellExecute = false,
                 RedirectStandardError = true,
+                StandardErrorEncoding = Encoding.UTF8
             };
             if (!string.IsNullOrWhiteSpace(workingDir))
                 info.WorkingDirectory = workingDir;
