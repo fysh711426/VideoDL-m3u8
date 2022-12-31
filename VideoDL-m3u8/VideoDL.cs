@@ -250,8 +250,7 @@ namespace VideoDL_m3u8
                             Console.ForegroundColor = ConsoleColor.DarkYellow;
                             Console.Write(msg);
                             Console.ResetColor();
-                        },
-                        token: token);
+                        });
 
                     Console.WriteLine("Finish.");
                     return;
@@ -507,8 +506,7 @@ namespace VideoDL_m3u8
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
                         Console.Write(msg);
                         Console.ResetColor();
-                    },
-                    token: token);
+                    });
 
                 Console.WriteLine("Finish.");
                 return;
