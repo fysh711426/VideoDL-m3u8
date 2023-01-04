@@ -534,6 +534,7 @@ public virtual async Task DownloadAsync(
     bool clearSource = false,
     Func<List<Part>, List<Part>>? partFilter = null,
     Func<List<Period>, List<Period>>? periodFilter = null,
+    bool quiet = false,
     CancellationToken token = default)
 ```
 
@@ -613,6 +614,9 @@ public virtual async Task DownloadAsync(
 
 * **periodFilter:** Func\<List\<Period\>, List\<Period\>\>, optional, default: null  
 　Set mpd period filter.  
+
+* **quiet:** bool, optional, default: false  
+　Set quiet mode.  
 
 * **token:** CancellationToken, optional, default: default  
 　Set cancellation token.  
