@@ -522,6 +522,7 @@ public virtual async Task DownloadAsync(
     int? videoMaxHeight = null,
     string? audioLanguage = null,
     int? noSegStopTime = null,
+    CancellationToken stopRecToken = default,
     bool binaryMerge = false, 
     bool keepFragmented = false, 
     bool discardcorrupt = false,
@@ -576,6 +577,9 @@ public virtual async Task DownloadAsync(
 
 * **noSegStopTime:** int, optional, default: null  
 　Set how long to stop after when there is no segment. (millisecond)  
+
+* **stopRecToken:** CancellationToken, optional, default: default  
+　Set stop REC cancellation token.  
 
 * **binaryMerge:** bool, optional, default: false  
 　Set use binary merge.  

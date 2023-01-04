@@ -73,6 +73,7 @@ namespace VideoDL_m3u8
         /// <param name="videoMaxHeight">Set video maximum resolution height.</param>
         /// <param name="audioLanguage">Set audio language.</param>
         /// <param name="noSegStopTime">Set how long to stop after when there is no segment.(millisecond)</param>
+        /// <param name="stopRecToken">Set stop REC cancellation token.</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="keepFragmented">Set keep fragmented mp4.</param>
         /// <param name="discardcorrupt">Set ffmpeg discard corrupted packets.</param>
@@ -93,7 +94,8 @@ namespace VideoDL_m3u8
             Func<List<Period>, List<Period>>? periodFilter = null,
             int threads = 1, int delay = 200, int maxRetry = 20, 
             long? maxSpeed = null, int interval = 1000, bool checkComplete = true, 
-            int? videoMaxHeight = null, string? audioLanguage = null, int? noSegStopTime = null,
+            int? videoMaxHeight = null, string? audioLanguage = null, 
+            int? noSegStopTime = null, CancellationToken stopRecToken = default,
             bool binaryMerge = false, bool keepFragmented = false, bool discardcorrupt = false,
             bool genpts = false, bool igndts = false, bool ignidx = false,
             OutputFormat outputFormat = OutputFormat.MP4,
@@ -230,6 +232,8 @@ namespace VideoDL_m3u8
                 {
                     try
                     {
+                        var cts = CancellationTokenSource.CreateLinkedTokenSource(token, stopRecToken);
+
                         await hlsDL.REC(
                             workDir, saveName, m3u8Url, header,
                             maxRetry: maxRetry, maxSpeed: maxSpeed,
@@ -240,9 +244,11 @@ namespace VideoDL_m3u8
                                 var sub = Console.WindowWidth - 2 - print.Length;
                                 Console.Write("\r" + print + new string(' ', sub) + "\r");
                             },
-                            token: token);
+                            token: cts.Token);
                     }
                     catch { }
+
+                    token.ThrowIfCancellationRequested();
 
                     Console.WriteLine("\nStart Merge...");
 
@@ -256,7 +262,8 @@ namespace VideoDL_m3u8
                             Console.ForegroundColor = ConsoleColor.DarkYellow;
                             Console.Write(msg);
                             Console.ResetColor();
-                        });
+                        },
+                        token: token);
 
                     Console.WriteLine("Finish.");
                     return;
@@ -421,6 +428,7 @@ namespace VideoDL_m3u8
         /// <param name="checkComplete">Set whether to check file count complete.</param>
         /// <param name="videoMaxHeight">Set video maximum resolution height.</param>
         /// <param name="noSegStopTime">Set how long to stop after when there is no segment.(millisecond)</param>
+        /// <param name="stopRecToken">Set stop REC cancellation token.</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="keepFragmented">Set keep fragmented mp4.</param>
         /// <param name="discardcorrupt">Set ffmpeg discard corrupted packets.</param>
@@ -437,8 +445,8 @@ namespace VideoDL_m3u8
         public virtual async Task HlsDownloadAsync(
             string workDir, string saveName, string url, string header = "",
             int threads = 1, int delay = 200, int maxRetry = 20, long? maxSpeed = null,
-            int interval = 1000, bool checkComplete = true,
-            int? videoMaxHeight = null, int? noSegStopTime = null,
+            int interval = 1000, bool checkComplete = true, int? videoMaxHeight = null,
+            int? noSegStopTime = null, CancellationToken stopRecToken = default,
             bool binaryMerge = false, bool keepFragmented = false, bool discardcorrupt = false,
             bool genpts = false, bool igndts = false, bool ignidx = false,
             OutputFormat outputFormat = OutputFormat.MP4,
@@ -489,6 +497,8 @@ namespace VideoDL_m3u8
             {
                 try
                 {
+                    var cts = CancellationTokenSource.CreateLinkedTokenSource(token, stopRecToken);
+
                     await hlsDL.REC(
                         workDir, saveName, m3u8Url, header,
                         maxRetry: maxRetry, maxSpeed: maxSpeed,
@@ -499,9 +509,11 @@ namespace VideoDL_m3u8
                             var sub = Console.WindowWidth - 2 - print.Length;
                             Console.Write("\r" + print + new string(' ', sub) + "\r");
                         },
-                        token: token);
+                        token: cts.Token);
                 }
                 catch { }
+
+                token.ThrowIfCancellationRequested();
 
                 Console.WriteLine("\nStart Merge...");
 
@@ -515,7 +527,8 @@ namespace VideoDL_m3u8
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
                         Console.Write(msg);
                         Console.ResetColor();
-                    });
+                    },
+                    token: token);
 
                 Console.WriteLine("Finish.");
                 return;
