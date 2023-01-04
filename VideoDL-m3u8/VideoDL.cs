@@ -70,6 +70,8 @@ namespace VideoDL_m3u8
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
         /// <param name="checkComplete">Set whether to check file count complete.</param>
+        /// <param name="videoMaxHeight">Set video maximum resolution height.</param>
+        /// <param name="audioLanguage">Set audio language.</param>
         /// <param name="noSegStopTime">Set how long to stop after when there is no segment.(millisecond)</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="keepFragmented">Set keep fragmented mp4.</param>
@@ -89,8 +91,9 @@ namespace VideoDL_m3u8
             string workDir, string saveName, string url, string header = "",
             Func<List<Part>, List<Part>>? partFilter = null,
             Func<List<Period>, List<Period>>? periodFilter = null,
-            int threads = 1, int delay = 200, int maxRetry = 20, long? maxSpeed = null, 
-            int interval = 1000, bool checkComplete = true, int? noSegStopTime = null,
+            int threads = 1, int delay = 200, int maxRetry = 20, 
+            long? maxSpeed = null, int interval = 1000, bool checkComplete = true, 
+            int? videoMaxHeight = null, string? audioLanguage = null, int? noSegStopTime = null,
             bool binaryMerge = false, bool keepFragmented = false, bool discardcorrupt = false,
             bool genpts = false, bool igndts = false, bool ignidx = false,
             OutputFormat outputFormat = OutputFormat.MP4,
@@ -165,7 +168,8 @@ namespace VideoDL_m3u8
                         var masterPlaylist = hlsDL.ParseMasterPlaylist(manifest, m3u8Url);
 
                         var highestStreamInfo = masterPlaylist.StreamInfos
-                            .GetWithHighestQuality();
+                            .GetWithHighestQuality(
+                                maxHeight: videoMaxHeight);
                         if (highestStreamInfo == null)
                             throw new Exception("Not found stream info.");
                         (manifest, m3u8Url) = await hlsDL.GetManifestAsync(
@@ -193,8 +197,10 @@ namespace VideoDL_m3u8
                     var period = periods.FirstOrDefault();
                     if (period == null)
                         throw new Exception("Not found mpd period.");
-                    var video = period.GetWithHighestQualityVideo();
-                    var audio = period.GetWithHighestQualityAudio();
+                    var video = period.GetWithHighestQualityVideo(
+                        maxHeight: videoMaxHeight);
+                    var audio = period.GetWithHighestQualityAudio(
+                        lang: audioLanguage);
 
                     if (video != null && audio != null)
                     {
@@ -413,6 +419,7 @@ namespace VideoDL_m3u8
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
         /// <param name="checkComplete">Set whether to check file count complete.</param>
+        /// <param name="videoMaxHeight">Set video maximum resolution height.</param>
         /// <param name="noSegStopTime">Set how long to stop after when there is no segment.(millisecond)</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="keepFragmented">Set keep fragmented mp4.</param>
@@ -430,7 +437,8 @@ namespace VideoDL_m3u8
         public virtual async Task HlsDownloadAsync(
             string workDir, string saveName, string url, string header = "",
             int threads = 1, int delay = 200, int maxRetry = 20, long? maxSpeed = null,
-            int interval = 1000, bool checkComplete = true, int? noSegStopTime = null,
+            int interval = 1000, bool checkComplete = true,
+            int? videoMaxHeight = null, int? noSegStopTime = null,
             bool binaryMerge = false, bool keepFragmented = false, bool discardcorrupt = false,
             bool genpts = false, bool igndts = false, bool ignidx = false,
             OutputFormat outputFormat = OutputFormat.MP4,
@@ -457,7 +465,8 @@ namespace VideoDL_m3u8
                 var masterPlaylist = hlsDL.ParseMasterPlaylist(manifest, m3u8Url);
 
                 var highestStreamInfo = masterPlaylist.StreamInfos
-                    .GetWithHighestQuality();
+                    .GetWithHighestQuality(
+                        maxHeight: videoMaxHeight);
                 if (highestStreamInfo == null)
                     throw new Exception("Not found stream info.");
                 (manifest, m3u8Url) = await hlsDL.GetManifestAsync(
@@ -648,6 +657,8 @@ namespace VideoDL_m3u8
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
         /// <param name="checkComplete">Set whether to check file count complete.</param>
+        /// <param name="videoMaxHeight">Set video maximum resolution height.</param>
+        /// <param name="audioLanguage">Set audio language.</param>
         /// <param name="binaryMerge">Set use binary merge.</param>
         /// <param name="keepFragmented">Set keep fragmented mp4.</param>
         /// <param name="discardcorrupt">Set ffmpeg discard corrupted packets.</param>
@@ -663,8 +674,9 @@ namespace VideoDL_m3u8
         /// <exception cref="Exception"></exception>
         public virtual async Task DashDownloadAsync(
             string workDir, string saveName, string url, string header = "",
-            int threads = 1, int delay = 200, int maxRetry = 20, long? maxSpeed = null,
-            int interval = 1000, bool checkComplete = true, bool binaryMerge = false,
+            int threads = 1, int delay = 200, int maxRetry = 20, 
+            long? maxSpeed = null, int interval = 1000, bool checkComplete = true,
+            int? videoMaxHeight = null, string? audioLanguage = null, bool binaryMerge = false,
             bool keepFragmented = false, bool discardcorrupt = false,
             bool genpts = false, bool igndts = false, bool ignidx = false,
             OutputFormat outputFormat = OutputFormat.MP4,
@@ -692,8 +704,10 @@ namespace VideoDL_m3u8
             var period = periods.FirstOrDefault();
             if (period == null)
                 throw new Exception("Not found mpd period.");
-            var video = period.GetWithHighestQualityVideo();
-            var audio = period.GetWithHighestQualityAudio();
+            var video = period.GetWithHighestQualityVideo(
+                maxHeight: videoMaxHeight);
+            var audio = period.GetWithHighestQualityAudio(
+                lang: audioLanguage);
 
             if (video != null && audio != null)
             {
