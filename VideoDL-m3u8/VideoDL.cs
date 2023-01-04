@@ -85,6 +85,7 @@ namespace VideoDL_m3u8
         /// <param name="clearSource">Set whether to clear source file after the muxing is completed.</param>
         /// <param name="partFilter">Set m3u8 part filter.</param>
         /// <param name="periodFilter">Set mpd period filter.</param>
+        /// <param name="quiet">Set quiet mode.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
@@ -100,7 +101,7 @@ namespace VideoDL_m3u8
             bool genpts = false, bool igndts = false, bool ignidx = false,
             OutputFormat outputFormat = OutputFormat.MP4,
             bool clearTempFile = false, bool clearSource = false,
-            CancellationToken token = default)
+            bool quiet = false, CancellationToken token = default)
         {
             var hlsDL = Hls;
             var dashDL = Dash;
@@ -108,7 +109,8 @@ namespace VideoDL_m3u8
 
             saveName = saveName.FilterFileName();
 
-            Console.WriteLine("Start Download...");
+            if (!quiet)
+                Console.WriteLine("Start Download...");
 
             var m3u8Url = "";
             var manifest = "";
@@ -240,9 +242,12 @@ namespace VideoDL_m3u8
                             interval: interval, noSegStopTime: noSegStopTime,
                             progress: (args) =>
                             {
-                                var print = args.Format;
-                                var sub = Console.WindowWidth - 2 - print.Length;
-                                Console.Write("\r" + print + new string(' ', sub) + "\r");
+                                if (!quiet)
+                                {
+                                    var print = args.Format;
+                                    var sub = Console.WindowWidth - 2 - print.Length;
+                                    Console.Write("\r" + print + new string(' ', sub) + "\r");
+                                }
                             },
                             token: cts.Token);
                     }
@@ -250,7 +255,8 @@ namespace VideoDL_m3u8
 
                     token.ThrowIfCancellationRequested();
 
-                    Console.WriteLine("\nStart Merge...");
+                    if (!quiet)
+                        Console.WriteLine("\nStart Merge...");
 
                     await hlsDL.MergeAsync(workDir, saveName,
                         outputFormat: outputFormat, binaryMerge: binaryMerge,
@@ -259,13 +265,17 @@ namespace VideoDL_m3u8
                         clearTempFile: clearTempFile,
                         onMessage: (msg) =>
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(msg);
-                            Console.ResetColor();
+                            if (!quiet)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write(msg);
+                                Console.ResetColor();
+                            }
                         },
                         token: token);
 
-                    Console.WriteLine("Finish.");
+                    if (!quiet)
+                        Console.WriteLine("Finish.");
                     return;
                 }
 
@@ -287,13 +297,17 @@ namespace VideoDL_m3u8
                         clearSource: clearSource,
                         onMessage: (msg) =>
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(msg);
-                            Console.ResetColor();
+                            if (!quiet)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write(msg);
+                                Console.ResetColor();
+                            }
                         },
                         token: token);
 
-                    Console.WriteLine("Finish.");
+                    if (!quiet)
+                        Console.WriteLine("Finish.");
                     return;
 
                     async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
@@ -310,7 +324,8 @@ namespace VideoDL_m3u8
                         if (segmentKeys.Count > 0)
                             keys = await Hls.GetKeysDataAsync(segmentKeys, header, token);
 
-                        Console.WriteLine($"Start {id} Download...");
+                        if (!quiet)
+                            Console.WriteLine($"Start {id} Download...");
 
                         await hlsDL.DownloadAsync(
                             workDir, saveName, parts, header, keys,
@@ -323,22 +338,29 @@ namespace VideoDL_m3u8
                             },
                             progress: (args) =>
                             {
-                                var print = args.Format;
-                                var sub = Console.WindowWidth - 2 - print.Length;
-                                Console.Write("\r" + print + new string(' ', sub) + "\r");
+                                if (!quiet)
+                                {
+                                    var print = args.Format;
+                                    var sub = Console.WindowWidth - 2 - print.Length;
+                                    Console.Write("\r" + print + new string(' ', sub) + "\r");
+                                }
                             },
                             token: token);
 
-                        Console.WriteLine($"\nStart {id} Merge...");
+                        if (!quiet)
+                            Console.WriteLine($"\nStart {id} Merge...");
 
                         var outputPath = await hlsDL.MergeAsync(workDir, saveName,
                             clearTempFile: clearTempFile, binaryMerge: true,
                             outputFormat: OutputFormat.MP4,
                             onMessage: (msg) =>
                             {
-                                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                                Console.Write(msg);
-                                Console.ResetColor();
+                                if (!quiet)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                    Console.Write(msg);
+                                    Console.ResetColor();
+                                }  
                             },
                             token: token);
                         return outputPath;
@@ -370,13 +392,17 @@ namespace VideoDL_m3u8
                         },
                         progress: (args) =>
                         {
-                            var print = args.Format;
-                            var sub = Console.WindowWidth - 2 - print.Length;
-                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            if (!quiet)
+                            {
+                                var print = args.Format;
+                                var sub = Console.WindowWidth - 2 - print.Length;
+                                Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            } 
                         },
                         token: token);
 
-                    Console.WriteLine("\nStart Merge...");
+                    if (!quiet)
+                        Console.WriteLine("\nStart Merge...");
 
                     await hlsDL.MergeAsync(workDir, saveName,
                         outputFormat: outputFormat, binaryMerge: binaryMerge,
@@ -385,13 +411,17 @@ namespace VideoDL_m3u8
                         clearTempFile: clearTempFile,
                         onMessage: (msg) =>
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(msg);
-                            Console.ResetColor();
+                            if (!quiet)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write(msg);
+                                Console.ResetColor();
+                            }
                         },
                         token: token);
 
-                    Console.WriteLine("Finish.");
+                    if (!quiet)
+                        Console.WriteLine("Finish.");
                     return;
                 }
             }
@@ -402,13 +432,17 @@ namespace VideoDL_m3u8
                 maxRetry: maxRetry, maxSpeed: maxSpeed, interval: interval,
                 progress: (args) =>
                 {
-                    var print = args.Format;
-                    var sub = Console.WindowWidth - 2 - print.Length;
-                    Console.Write("\r" + print + new string(' ', sub) + "\r");
+                    if (!quiet)
+                    {
+                        var print = args.Format;
+                        var sub = Console.WindowWidth - 2 - print.Length;
+                        Console.Write("\r" + print + new string(' ', sub) + "\r");
+                    }
                 },
                 token: token);
 
-            Console.WriteLine("\nFinish.");
+            if (!quiet)
+                Console.WriteLine("\nFinish.");
         }
 
         /// <summary>
@@ -439,6 +473,7 @@ namespace VideoDL_m3u8
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
         /// <param name="clearSource">Set whether to clear source file after the muxing is completed.</param>
         /// <param name="partFilter">Set m3u8 part filter.</param>
+        /// <param name="quiet">Set quiet mode.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
@@ -452,7 +487,7 @@ namespace VideoDL_m3u8
             OutputFormat outputFormat = OutputFormat.MP4,
             bool clearTempFile = false, bool clearSource = false,
             Func<List<Part>, List<Part>>? partFilter = null,
-            CancellationToken token = default)
+            bool quiet = false, CancellationToken token = default)
         {
             var hlsDL = Hls;
             var dashDL = Dash;
@@ -460,7 +495,8 @@ namespace VideoDL_m3u8
 
             saveName = saveName.FilterFileName();
 
-            Console.WriteLine("Start Download...");
+            if (!quiet)
+                Console.WriteLine("Start Download...");
 
             var (manifest, m3u8Url) = await hlsDL.GetManifestAsync(url, header, token);
 
@@ -505,9 +541,12 @@ namespace VideoDL_m3u8
                         interval: interval, noSegStopTime: noSegStopTime,
                         progress: (args) =>
                         {
-                            var print = args.Format;
-                            var sub = Console.WindowWidth - 2 - print.Length;
-                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            if (!quiet)
+                            {
+                                var print = args.Format;
+                                var sub = Console.WindowWidth - 2 - print.Length;
+                                Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            }
                         },
                         token: cts.Token);
                 }
@@ -515,7 +554,8 @@ namespace VideoDL_m3u8
 
                 token.ThrowIfCancellationRequested();
 
-                Console.WriteLine("\nStart Merge...");
+                if (!quiet)
+                    Console.WriteLine("\nStart Merge...");
 
                 await hlsDL.MergeAsync(workDir, saveName,
                     outputFormat: outputFormat, binaryMerge: binaryMerge,
@@ -524,13 +564,17 @@ namespace VideoDL_m3u8
                     clearTempFile: clearTempFile,
                     onMessage: (msg) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write(msg);
-                        Console.ResetColor();
+                        if (!quiet)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(msg);
+                            Console.ResetColor();
+                        }
                     },
                     token: token);
 
-                Console.WriteLine("Finish.");
+                if (!quiet)
+                    Console.WriteLine("Finish.");
                 return;
             }
 
@@ -552,13 +596,17 @@ namespace VideoDL_m3u8
                     clearSource: clearSource,
                     onMessage: (msg) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write(msg);
-                        Console.ResetColor();
+                        if (!quiet)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(msg);
+                            Console.ResetColor();
+                        }
                     },
                     token: token);
 
-                Console.WriteLine("Finish.");
+                if (!quiet)
+                    Console.WriteLine("Finish.");
                 return;
 
                 async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
@@ -572,7 +620,8 @@ namespace VideoDL_m3u8
                     if (segmentKeys.Count > 0)
                         keys = await Hls.GetKeysDataAsync(segmentKeys, header, token);
 
-                    Console.WriteLine($"Start {id} Download...");
+                    if (!quiet)
+                        Console.WriteLine($"Start {id} Download...");
 
                     await hlsDL.DownloadAsync(
                         workDir, saveName, parts, header, keys,
@@ -585,22 +634,29 @@ namespace VideoDL_m3u8
                         },
                         progress: (args) =>
                         {
-                            var print = args.Format;
-                            var sub = Console.WindowWidth - 2 - print.Length;
-                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            if (!quiet)
+                            {
+                                var print = args.Format;
+                                var sub = Console.WindowWidth - 2 - print.Length;
+                                Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            }
                         },
                         token: token);
 
-                    Console.WriteLine($"\nStart {id} Merge...");
+                    if (!quiet)
+                        Console.WriteLine($"\nStart {id} Merge...");
 
                     var outputPath = await hlsDL.MergeAsync(workDir, saveName,
                         clearTempFile: clearTempFile, binaryMerge: true,
                         outputFormat: OutputFormat.MP4,
                         onMessage: (msg) =>
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(msg);
-                            Console.ResetColor();
+                            if (!quiet)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write(msg);
+                                Console.ResetColor();
+                            }
                         },
                         token: token);
                     return outputPath;
@@ -629,13 +685,17 @@ namespace VideoDL_m3u8
                     },
                     progress: (args) =>
                     {
-                        var print = args.Format;
-                        var sub = Console.WindowWidth - 2 - print.Length;
-                        Console.Write("\r" + print + new string(' ', sub) + "\r");
+                        if (!quiet)
+                        {
+                            var print = args.Format;
+                            var sub = Console.WindowWidth - 2 - print.Length;
+                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                        } 
                     },
                     token: token);
 
-                Console.WriteLine("\nStart Merge...");
+                if (!quiet)
+                    Console.WriteLine("\nStart Merge...");
 
                 await hlsDL.MergeAsync(workDir, saveName,
                     outputFormat: outputFormat, binaryMerge: binaryMerge,
@@ -644,13 +704,17 @@ namespace VideoDL_m3u8
                     clearTempFile: clearTempFile,
                     onMessage: (msg) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write(msg);
-                        Console.ResetColor();
+                        if (!quiet)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(msg);
+                            Console.ResetColor();
+                        }
                     },
                     token: token);
 
-                Console.WriteLine("Finish.");
+                if (!quiet)
+                    Console.WriteLine("Finish.");
                 return;
             }
         }
@@ -682,6 +746,7 @@ namespace VideoDL_m3u8
         /// <param name="clearTempFile">Set whether to clear the temporary file after the merge is completed.</param>
         /// <param name="clearSource">Set whether to clear source file after the muxing is completed.</param>
         /// <param name="periodFilter">Set mpd period filter.</param>
+        /// <param name="quiet">Set quiet mode.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
@@ -695,7 +760,7 @@ namespace VideoDL_m3u8
             OutputFormat outputFormat = OutputFormat.MP4,
             bool clearTempFile = false, bool clearSource = false,
             Func<List<Period>, List<Period>>? periodFilter = null,
-            CancellationToken token = default)
+            bool quiet = false, CancellationToken token = default)
         {
             var hlsDL = Hls;
             var dashDL = Dash;
@@ -703,7 +768,8 @@ namespace VideoDL_m3u8
 
             saveName = saveName.FilterFileName();
 
-            Console.WriteLine("Start Download...");
+            if (!quiet)
+                Console.WriteLine("Start Download...");
 
             var audioPlaylist = null as MediaPlaylist;
             var mediaPlaylist = null as MediaPlaylist;
@@ -762,13 +828,17 @@ namespace VideoDL_m3u8
                     clearSource: clearSource,
                     onMessage: (msg) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write(msg);
-                        Console.ResetColor();
+                        if (!quiet)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(msg);
+                            Console.ResetColor();
+                        }
                     },
                     token: token);
 
-                Console.WriteLine("Finish.");
+                if (!quiet)
+                    Console.WriteLine("Finish.");
                 return;
 
                 async Task<string> downloadMerge(string id, string saveName, MediaPlaylist mediaPlaylist)
@@ -778,7 +848,8 @@ namespace VideoDL_m3u8
                     if (segmentKeys.Count > 0)
                         keys = await Hls.GetKeysDataAsync(segmentKeys, header, token);
 
-                    Console.WriteLine($"Start {id} Download...");
+                    if (!quiet)
+                        Console.WriteLine($"Start {id} Download...");
 
                     await hlsDL.DownloadAsync(workDir, saveName,
                         mediaPlaylist.Parts, header, keys,
@@ -791,22 +862,29 @@ namespace VideoDL_m3u8
                         },
                         progress: (args) =>
                         {
-                            var print = args.Format;
-                            var sub = Console.WindowWidth - 2 - print.Length;
-                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            if (!quiet)
+                            {
+                                var print = args.Format;
+                                var sub = Console.WindowWidth - 2 - print.Length;
+                                Console.Write("\r" + print + new string(' ', sub) + "\r");
+                            }
                         },
                         token: token);
 
-                    Console.WriteLine($"\nStart {id} Merge...");
+                    if (!quiet)
+                        Console.WriteLine($"\nStart {id} Merge...");
 
                     var outputPath = await hlsDL.MergeAsync(workDir, saveName,
                         clearTempFile: clearTempFile, binaryMerge: true,
                         outputFormat: OutputFormat.MP4,
                         onMessage: (msg) =>
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(msg);
-                            Console.ResetColor();
+                            if (!quiet)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                Console.Write(msg);
+                                Console.ResetColor();
+                            }
                         },
                         token: token);
                     return outputPath;
@@ -831,13 +909,17 @@ namespace VideoDL_m3u8
                     },
                     progress: (args) =>
                     {
-                        var print = args.Format;
-                        var sub = Console.WindowWidth - 2 - print.Length;
-                        Console.Write("\r" + print + new string(' ', sub) + "\r");
+                        if (!quiet)
+                        {
+                            var print = args.Format;
+                            var sub = Console.WindowWidth - 2 - print.Length;
+                            Console.Write("\r" + print + new string(' ', sub) + "\r");
+                        }
                     },
                     token: token);
 
-                Console.WriteLine("\nStart Merge...");
+                if (!quiet)
+                    Console.WriteLine("\nStart Merge...");
 
                 await hlsDL.MergeAsync(workDir, saveName,
                     outputFormat: outputFormat, binaryMerge: binaryMerge,
@@ -846,13 +928,17 @@ namespace VideoDL_m3u8
                     clearTempFile: clearTempFile,
                     onMessage: (msg) =>
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write(msg);
-                        Console.ResetColor();
+                        if (!quiet)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(msg);
+                            Console.ResetColor();
+                        }  
                     },
                     token: token);
 
-                Console.WriteLine("Finish.");
+                if (!quiet)
+                    Console.WriteLine("Finish.");
                 return;
             }
         }
@@ -871,14 +957,15 @@ namespace VideoDL_m3u8
         /// <param name="maxSpeed">Set the maximum download speed.(byte)
         /// 1KB = 1024 byte, 1MB = 1024 * 1024 byte</param>
         /// <param name="interval">Set the progress callback time interval.(millisecond)</param>
+        /// <param name="quiet">Set quiet mode.</param>
         /// <param name="token">Set cancellation token.</param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
         public virtual async Task HttpDownloadAsync(
             string workDir, string saveName, string url, string header = "", 
             int threads = 1, int delay = 200, int maxRetry = 20, 
-            long? maxSpeed = null, int interval = 1000, 
-            CancellationToken token = default)
+            long? maxSpeed = null, int interval = 1000,
+            bool quiet = false, CancellationToken token = default)
         {
             var hlsDL = Hls;
             var dashDL = Dash;
@@ -886,20 +973,25 @@ namespace VideoDL_m3u8
 
             saveName = saveName.FilterFileName();
 
-            Console.WriteLine("Start Download...");
+            if (!quiet)
+                Console.WriteLine("Start Download...");
 
             await httpDL.DownloadAsync(workDir, saveName,
                 url, header, threads: threads, delay: delay,
                 maxRetry: maxRetry, maxSpeed: maxSpeed, interval: interval,
                 progress: (args) =>
                 {
-                    var print = args.Format;
-                    var sub = Console.WindowWidth - 2 - print.Length;
-                    Console.Write("\r" + print + new string(' ', sub) + "\r");
+                    if (!quiet)
+                    {
+                        var print = args.Format;
+                        var sub = Console.WindowWidth - 2 - print.Length;
+                        Console.Write("\r" + print + new string(' ', sub) + "\r");
+                    }
                 },
                 token: token);
 
-            Console.WriteLine("\nFinish.");
+            if (!quiet)
+                Console.WriteLine("\nFinish.");
         }
     }
 }
