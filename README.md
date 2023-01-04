@@ -519,6 +519,8 @@ public virtual async Task DownloadAsync(
     long? maxSpeed = null,
     int interval = 1000, 
     bool checkComplete = true, 
+    int? videoMaxHeight = null,
+    string? audioLanguage = null,
     int? noSegStopTime = null,
     bool binaryMerge = false, 
     bool keepFragmented = false, 
@@ -556,7 +558,7 @@ public virtual async Task DownloadAsync(
 * **maxRetry:** int, optional, default: 20  
 　Set the maximum number of download retries.  
 
-* **maxSpeed:** long?, optional, default: null  
+* **maxSpeed:** long, optional, default: null  
 　Set the maximum download speed. (byte)  
 　1KB = 1024 byte, 1MB = 1024 * 1024 byte  
         
@@ -566,7 +568,13 @@ public virtual async Task DownloadAsync(
 * **checkComplete:** bool, optional, default: true  
 　Set whether to check file count complete.  
 
-* **noSegStopTime:** int?, optional, default: null  
+* **videoMaxHeight:** int, optional, default: null  
+　Set video maximum resolution height.  
+
+* **audioLanguage:** string, optional, default: null  
+　Set audio language.  
+
+* **noSegStopTime:** int, optional, default: null  
 　Set how long to stop after when there is no segment. (millisecond)  
 
 * **binaryMerge:** bool, optional, default: false  
@@ -654,7 +662,7 @@ public async Task DownloadAsync(
 * **maxRetry:** int, optional, default: 20  
 　Set the maximum number of download retries.  
 
-* **maxSpeed:** long?, optional, default: null  
+* **maxSpeed:** long, optional, default: null  
 　Set the maximum download speed. (byte)  
 　1KB = 1024 byte, 1MB = 1024 * 1024 byte  
         
@@ -769,14 +777,14 @@ public async Task REC(
 * **maxRetry:** int, optional, default: 20  
 　Set the maximum number of download retries.  
 
-* **maxSpeed:** long?, optional, default: null  
+* **maxSpeed:** long, optional, default: null  
 　Set the maximum download speed. (byte)  
 　1KB = 1024 byte, 1MB = 1024 * 1024 byte  
 
 * **interval:** int, optional, default: 1000  
 　Set the progress callback time interval. (millisecond)  
 
-* **noSegStopTime:** int?, optional, default: null  
+* **noSegStopTime:** int, optional, default: null  
 　Set how long to stop after when there is no segment. (millisecond)  
 
 * **onSegment:** Func<Stream, CancellationToken, Task\<Stream\>\>, optional, default: null  
